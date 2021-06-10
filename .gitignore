@@ -1,0 +1,4 @@
+build
+debug
+dist
+!dist/default/production/PIC.production.hex
