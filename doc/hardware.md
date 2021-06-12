@@ -56,6 +56,4 @@ The capacitor connected to C12INx- is charged via the resistor. Once the voltage
 So the frequency of this oscillator depends on the capacitor and timer 0 is counting it. The sensor is also connected to the same C12INx- and touching increases the total capacity. As a consequence the frequency will drop and  timer 0 registers less flips in the same amount of time.  
 ## Thermometers
 There are two DS18B20 thermometers built into this thermostat. One connected RB4 (the external sensor the one beneath the holes) and another one near the power train connected to RB6 (not really useful)
-## Hardware modifications
-[External thermometer](mod_external_thermometer.md)  
-[Light sensor](mod_light_sensor.md)
+## [Hardware modifications](hardware_mod.md)
