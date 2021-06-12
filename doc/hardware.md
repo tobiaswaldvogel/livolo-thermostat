@@ -1,6 +1,6 @@
 # Hardware
 The circuit is pretty straightforward if you have some experience with microcontrollers. The capacity sensor piece was new to me but the Microchip application note AN1101 gives a pretty good overview (worth reading it)  
-<img src="doc/mod_thermometer.jpg" />  
+<img src="mod_thermometer.jpg" />  
 Mainboard with external thermometer
 
 ## Pinout of the PICF16690 microcontroller
@@ -57,5 +57,5 @@ So the frequency of this oscillator depends on the capacitor and timer 0 is coun
 ## Thermometers
 There are two DS18B20 thermometers built into this thermostat. One connected RB4 (the external sensor the one beneath the holes) and another one near the power train connected to RB6 (not really useful)
 ## Hardware modifications
-[External thermometer](mod_external_thermometer.md)
+[External thermometer](mod_external_thermometer.md)  
 [Light sensor](mod_light_sensor.md)
