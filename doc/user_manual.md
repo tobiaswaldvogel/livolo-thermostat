@@ -36,7 +36,8 @@ Setting a new temperature however always has an immediate effect
 Switches between Celsius and Fahrenheit
 
 ### Light sensor value
-This is only displayed if you added the light sensor. The Celsius and Fahrenheit LEDs are flashing as well.
+This is only displayed if you added the light sensor. The Celsius and Fahrenheit LEDs are flashing as well.  
+<img src="light_sensor_status.jpg"/>
 
 ### Light sensor threshold
 Threshold for turning the display off (night mode). The light sensor value from the step before can be used to find a good setting.
