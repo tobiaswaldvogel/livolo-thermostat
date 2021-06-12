@@ -16,7 +16,7 @@ Probably the easiest solution would be just to get other thermostats but if you 
 ### Hardware modification (thermometer)
 You can find a detailed description of the hardware and circuit on the Hardware Description page  
 Therefore, the first thing I started to think about was taking the sensor out of the housing to get a better measurement. Fortunately, the thermometer is a standard DS18B20 chip, so I got the SMD version and soldered it on a copper plate for taking the temperature of the environment. (The temperature is measured on the ground pin by the way). Before I bent the pin 1 (DQ) and pin 8 (Vdd) up in order to connect the cable.  
-<img src="doc/ds18b20_smd.jpg" height="150"> <img src="doc/mod_thermometer_front.jpg" height="150">  
+<img src="doc/ds18b20_smd.jpg" height="150"> <img src="doc/mod_thermometer_small.jpg" height="150"> <img src="doc/mod_thermometer_front.jpg" height="150">  
 My new firmware also supports the so-called "parasite power mode", which only requires two wires. So you can connect pin 8 also to ground, together with all others. That makes it a little bit easier to build.
 This new sensor replaces then the internal sensor beneath the airflow holes. However, this alone did not lead to much improvement. Now the temperature displayed was too low.
 ### Software
