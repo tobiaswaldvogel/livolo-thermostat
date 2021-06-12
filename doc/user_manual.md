@@ -3,8 +3,8 @@
 The temperature can be adjusted by touching "+" or "-".  
 <img src="valve_off.jpg"/>  
 After 2 seconds the display will display again the current temperature  
-The blue circle indicates that the heating is currently off
-When the heating is active the indicator will turn red  
+The blue circle indicates that the heating is currently off.  
+When the heating is active the indicator will turn red.  
 ## Stand by
 Touching the 'O' will turn the the thermostat to stand-by, which will turn off the display and set the minimum temperature to 5° Celsius / 41° Fahrenheit (freeze protection)
 ## Display off (night mode)
