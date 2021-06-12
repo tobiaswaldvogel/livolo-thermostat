@@ -27,9 +27,10 @@ and positive values on the right
 
 ### Delay after temperature change
 Time to wait after a temperature change to settle before acting the heating  
-The range is from 01 to 99 with a unit of 10s. So the minimum delay is 10s and the maximum 16:30 (99 * 10s)  
+The range is from 01 to 99 with a unit of 10s.  
+So the minimum delay is 10s and the maximum 16:30 (99 * 10s)  
 <img src="valve_delay.jpg"/>  
-Setting a new temperature has an immediate effect  
+Setting a new temperature however always has an immediate effect  
 
 ### Unit (Celsius / Fahrenheit)
 Switches between Celsius and Fahrenheit
