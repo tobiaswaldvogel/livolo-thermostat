@@ -38,3 +38,9 @@ Range 1..99 with a unit of 10s, s from 10s to 16m30
 If the valves are closed for more than 7 days then they will be opened for 5 minutes. If the light sensor detects night mode then it is delayed until there is light again.
 ### Hardware modification (light sensor)
 For my bedroom, I wanted the display to turn off automatically in the darkness. Therefore, I considered also adding a light sensor. There is another DS18B20 thermometer inside, which is not really useful, so we can use this pin for it. Unfortunately pin 8 (RB6) cannot be configure as A/D converter input, so I connected the external thermometer to this pin and the photo resistor to pin 10 (RB4), which can be used for the ADC. My firmware detects the thermometer automatically. Therefore, you may or may not do this mod.
+
+## Getting started
+[Hardware description](doc/hardware.md)  
+[Hardware modification external sensor](doc/mod_external_thermometer.md)  
+[Hardware modification light sensor](doc/mod_light_sensor.md)
+[Program new firmware](doc/firmware_update.md) 
