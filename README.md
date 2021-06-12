@@ -41,6 +41,6 @@ For my bedroom, I wanted the display to turn off automatically in the darkness. 
 
 ## Getting started
 [Hardware description](doc/hardware.md)  
-[Hardware modification external sensor](doc/mod_external_thermometer.md)  
-[Hardware modification light sensor](doc/mod_light_sensor.md)
-[Program new firmware](doc/firmware_update.md) 
+[Hardware modifications](doc/hardware_mod.md)  
+[User mannual](doc/user_manual.md)
+
