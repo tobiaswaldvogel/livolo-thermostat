@@ -4,7 +4,6 @@
     <logicalFolder name="HeaderFiles"
                    displayName="Header Files"
                    projectFiles="true">
-      <itemPath>Livolo_thermostat/global.h</itemPath>
       <itemPath>Livolo_thermostat/global.inc</itemPath>
       <itemPath>Livolo_thermostat/one_wire.inc</itemPath>
     </logicalFolder>
@@ -88,7 +87,6 @@
         <property key="debugoptions.debug-startup" value="Use system settings"/>
         <property key="debugoptions.reset-behaviour" value="Use system settings"/>
         <property key="debugoptions.useswbreakpoints" value="false"/>
-        <property key="firmware.download.all" value="false"/>
         <property key="hwtoolclock.frcindebug" value="false"/>
         <property key="memories.aux" value="false"/>
         <property key="memories.bootflash" value="true"/>
@@ -133,6 +131,7 @@
         <property key="debugoptions.debug-startup" value="Use system settings"/>
         <property key="debugoptions.reset-behaviour" value="Use system settings"/>
         <property key="debugoptions.useswbreakpoints" value="false"/>
+        <property key="firmware.download.all" value="false"/>
         <property key="hwtoolclock.frcindebug" value="false"/>
         <property key="memories.aux" value="false"/>
         <property key="memories.bootflash" value="true"/>
