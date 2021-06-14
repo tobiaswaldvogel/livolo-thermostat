@@ -170,25 +170,7 @@ timer_valve_maint:	btfsc	FLAG_NIGHT_MODE
 ;--------------------------------------------------------- 
 ; Timer for light sensor ADC
 ;--------------------------------------------------------- 
-#if 0
 timer_adc:		bcf	SIGNAL_TIMER_ADC
-			bcf	FLAG_NIGHT_MODE
-			movlw	99
-			movwf	light_sensor_value
-
-			movf	ADRESH, w
-			addlw	- (255 - 98)
-			btfss	CARRY
-			goto	timer_adc_check_disp	; > 255 - 98 => on
-
-			sublw	99			; 1 .. 99
-			movwf	light_sensor_value	; For display in setup
-			subwf	light_sensor_limit, w
-			btfsc	CARRY			; cc -> > light_sensor_limit
-			bsf	FLAG_NIGHT_MODE
-#endif
-timer_adc:		bcf	SIGNAL_TIMER_ADC
-;			bcf	FLAG_NIGHT_MODE
 			movlw	99
 			movwf	light_sensor_value	; For display in setup
 
@@ -242,31 +224,6 @@ night_mode:		btfsc	FLAG_KEEP_DISPLAY_ON
 			call	display_off
 			goto	timer_adc_next
 
-#if 0
-timer_adc_check_disp:	btfsc	FLAG_KEEP_DISPLAY_ON
-			goto	timer_adc_next
-			movf	setup_mode, w
-			btfss	ZERO
-			goto	timer_adc_next		; Skip in setup
-			btfsc	FLAG_STANDBY
-			goto	timer_adc_next		; Skip in stand-by
-			btfsc	FLAG_DISPLAY_OFF
-			goto	timer_adc_next		; Skip if manually switched off
-			
-			btfss	FLAG_NIGHT_MODE
-			goto	timer_adc_disp_on
-			
-			; Switch display off
-			btfsc	FLAG_DISPLAY_ENABLE	; Switch display off if on
-			call	display_off
-			goto	timer_adc_next
-			
-			; Switch display on
-timer_adc_disp_on:  	btfss	FLAG_DISPLAY_ENABLE
-			call	display_on
-
-			
-#endif
 timer_adc_clear_cntr:   clrf	light_sensor_counter
 			
 timer_adc_next:		bsf	ADCON0, ADCON0_GO_nDONE_POSN
