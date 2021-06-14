@@ -44,7 +44,7 @@ Back in "Operate" run the blank check, which should now confirm that the device 
 If you prefer building the hex file on your own, or if you want to change something, then you can use MPLab IDE.  
 The programmer is fully integrated in the IDE and you can trigger the build and flashing directly from there.  
 
-[Back to README](/README.md)
+[Back to README](/README.md)  
 [Hardware description](doc/hardware.md)  
 [Hardware modifications](doc/hardware_mod.md)  
 [User mannual](doc/user_manual.md)
