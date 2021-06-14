@@ -42,7 +42,7 @@
 #define DISP_D              PORTC, 6
 #define DISP_LEFT           PORTA, 0
 #define DISP_RIGHT          PORTA, 1
-#define VALVE               PORTB, 5
+#define RELAY               PORTB, 5
 #define LED_CELSIUS         PORTC, 7
 #define LED_FAHRENHEIT      PORTB, 7
 #define LED_POWER	    PORTC, 0
@@ -50,9 +50,8 @@
 #define _XTAL_FREQ 4000000
 
 TIMER0_RELOAD		    equ	128	; Counter for cap sensor oscillator
-ADC_TIMER_RELOAD	    equ	55	; ADC measure frequency for light sensor ( in 20ms units)
+ADC_TIMER_RELOAD	    equ	15	; ADC measure frequency for light sensor ( in 20ms units)
 
-FLASH_PER_SEC		    equ 1	; Flashes per second in setup mode
 INACTITIVY_TIMER	    equ 50 * 2	; Display time for target temperature (in 20ms units) = 2s
 KEEP_DISPLAY_ON_TIMER	    equ 50 * 10	; Delay after a touch event before the display can be switched off again
 VALVE_MAINTENANCE	    equ 50 * 60 * 60 * 24 * 7	    ; 20ms units = 7 days
@@ -65,10 +64,17 @@ FAHRENHEIT_MIN		    equ 41
 FAHRENHEIT_DEFAULT	    equ 73
 FAHRENHEIT_MAX		    equ	99
 
+RELAY_DELAY_MAX		    equ	99	; Unit 10sec = 16m:30
+VALVE_MAINTAIN_MAX	    equ	14	; Unit days
+LIGHT_SENSOR_MAX	    equ	99
+	    
+OPERATION_MODE_COOLING	    equ 55h	; EEPROM value 
+OPERATION_MODE_MAX	    equ	1
+	    
 ; Temperture in stand-by mode
 STANDBY_TARGET_TEMPERATURE_CELSIUS  equ	(5 << 1)
 	  
-VALVE_DELAY_DEFAULT	    equ	3	; Default delay for open / close valve in 10s units
+RELAY_DELAY_DEFAULT	    equ	3	; Default delay for open / close valve in 10s units
 MIN_TOUCH		    equ	4	; Minimum touch time
 LONG_TOUCH		    equ	50	; Long touch time (in 20ms units) 1 sec
 
@@ -95,24 +101,28 @@ global	flags1, flags2, setup_mode
 global	disp_l, disp_r
 global  timer50hz
 global	var_timer_thermometer, var_timer_adc, var_timer_inactivity
-global  var_timer_valve, var_timer_valve_maint, var_timer_keep_displ_on
-		
-global	target_temperature, valve_delay, temperature_offset
-global	current_temperature, light_sensor_limit, light_sensor_value
+global  var_timer_relay, var_timer_valve_maint, var_timer_keep_displ_on
+global	timer_valve_maint_mult, var_timer_valve_maint_set
+   
+global	target_temperature, relay_delay, temperature_offset
+global	current_temperature, light_sensor_limit, light_sensor_value, light_sensor_counter
+global	valve_maintain_days, operation_mode
 
 ; EEPROM locations   
 global  EE_TARGET_TEMPERATURE, EE_TEMPERATURE_OFFSET
-global  EE_VALVE_DELAY, EE_FAHRENHEIT, EE_LIGHT_SENSOR
-			
+global  EE_RELAY_DELAY, EE_FAHRENHEIT, EE_LIGHT_SENSOR
+global  EE_VALVE_MAINTAIN, EE_OPERATION_MODE
 
 ; Signals and flags
+; Sensor signals
 #define SIGNAL_TOUCH_MINUS_SHORT	signal_touch, 0
 #define SIGNAL_TOUCH_POWER_SHORT	signal_touch, 1
 #define	SIGNAL_TOUCH_PLUS_SHORT		signal_touch, 2
 #define SIGNAL_TOUCH_MINUS_LONG		signal_touch, 4
 #define SIGNAL_TOUCH_POWER_LONG		signal_touch, 5
 #define SIGNAL_TOUCH_PLUS_LONG		signal_touch, 6
-	      
+
+; Timer signals   
 #define SIGNAL_TIMER_INACTIVITY		signal_timer, 0
 #define SIGNAL_TIMER_THERMOMETER	signal_timer, 1
 #define SIGNAL_TIMER_VALVE		signal_timer, 2
@@ -122,12 +132,13 @@ global  EE_VALVE_DELAY, EE_FAHRENHEIT, EE_LIGHT_SENSOR
   
 #define FLAG_TMR2_INT_EVEN	    flags1, 0
 #define FLAG_FAHRENHEIT		    flags1, 1
-#define FLAG_VALVE_STATUS	    flags1, 2
+//#define FLAG_VALVE_STATUS	    flags1, 2
 #define FLAG_TEMPERATURE_CHANGED    flags1, 3
-#define FLAG_VALVE_IMMEDIATE	    flags1, 4
+#define FLAG_RELAY_IMMEDIATE	    flags1, 4
 #define FLAG_ONEWIRE_RB6	    flags1, 5
 #define FLAG_ONEWIRE_SELF_POWERED   flags1, 6
 
+; Display / Stand-by flags   
 #define FLAG_DISPLAY_ENABLE	    flags2, 0
 #define FLAG_STANDBY		    flags2, 1
 #define FLAG_DISPLAY_OFF	    flags2, 2

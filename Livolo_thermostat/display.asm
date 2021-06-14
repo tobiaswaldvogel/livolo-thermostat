@@ -4,81 +4,8 @@
 psect   code
 
 ; Publish    
-global	display_temperature, display_setup, display_setup_blank
-global	display_decimal, display_on, display_off
+global	display_temperature, display_decimal, display_on, display_off
 
-;--------------------------------------------------------- 
-; Display setup values
-;--------------------------------------------------------- 
-display_setup:		movf	timer50hz, w
-			addlw	-10
-			btfss	CARRY
-			goto	display_setup_blank
-
-			decf	setup_mode, w
-			btfss	ZERO
-			goto	display_setup_delay
-
-			; Display offset
-			movlw   0fh	; Invalid BCD for blanking digit
-			btfsc   temperature_offset, 7
-			goto    display__setup_off_neg
-
-			movwf   disp_l;	; Positive value => left invalid
-			movf    temperature_offset, w
-			movwf	disp_r
-			return
-
-display__setup_off_neg:	movwf   disp_r;	; Negative value >= right invalid
-			movf    temperature_offset, w
-			xorlw	0xff		; 2 complement
-			addlw	0x01
-			movwf	disp_l
-			return
-
-display_setup_delay:	addlw	-1
-			btfss	ZERO
-			goto	display_setup_unit
-
-			; Display valve delay
-			movf	valve_delay, w
-			call	display_decimal
-			return
-
-display_setup_unit:	addlw	-1
-			btfss	ZERO
-			goto	display_setup_ls_val
-
-			; Display unit
-			btfss   FLAG_FAHRENHEIT
-			bsf	LED_CELSIUS
-			btfsc   FLAG_FAHRENHEIT
-			bsf	LED_FAHRENHEIT
-			return
-
-display_setup_ls_val:	addlw	-1
-			btfss	ZERO
-			goto	display_setup_ls
-
-			; Display light sensor value
-			bsf	LED_FAHRENHEIT
-			bsf	LED_CELSIUS
-			movf	light_sensor_value, w
-			call	display_decimal
-			return
-
-display_setup_ls:	; Display light sensor limit
-			movf	light_sensor_limit, w
-			call	display_decimal
-			return
-
-display_setup_blank:	movlw	0fh
-			movwf	disp_l
-			movwf	disp_r
-			bcf	LED_CELSIUS
-			bcf	LED_FAHRENHEIT
-			return
-			
 ;--------------------------------------------------------- 
 ; Display temperature in w
 ;--------------------------------------------------------- 
@@ -142,14 +69,14 @@ display_on:		bsf	FLAG_DISPLAY_ENABLE
 			btfss	FLAG_FAHRENHEIT
 			bcf	LED_FAHRENHEIT
     
-			btfsc	VALVE		; Ventil offen ?
-			goto	display_on_valve
+			btfsc	RELAY		; Ventil offen ?
+			goto	display_on_relay
 			bsf	RP0
 			bsf	LED_POWER	; TRIS -> input
 			bcf	RP0		; => lit + blue led
 			return
 			
-display_on_valve:	bsf	RP0
+display_on_relay:	bsf	RP0
 			bcf	LED_POWER	; TRIS -> output
 			bcf	RP0
 			bsf	LED_POWER	; => lit + red led

@@ -5,8 +5,8 @@
 global	read_eeprom, write_eeprom
 global	one_wire_reset
 global	main, failure
-global  chk_target_temp_range, chk_offset_range, chk_0_99_range
-			
+global  chk_target_temp_range, chk_offset_range
+global	valve_maint_calc			
 
 config WDTE = OFF       // Watchdog Timer Enable bit (WDT disabled and can be enabled by SWDTEN bit of the WDTCON register)
 config CP = OFF         // Code Protection bit (Program memory code protection is disabled)
@@ -161,6 +161,10 @@ init_clear_bank0:	clrf	INDF
 			
 			clrf	STATUS		; Select bank 0
 
+;--------------------------------------------------------- 
+; Read EEPROM settings
+;--------------------------------------------------------- 
+			
 			;Restore unit
 			movlw	EE_FAHRENHEIT
 			call	read_eeprom
@@ -197,13 +201,30 @@ target_temp_offset:	movlw	EE_TEMPERATURE_OFFSET
 			clrf	temperature_offset	; Default to 0
     
 			; Restore valve delay
-			movlw	EE_VALVE_DELAY
+			movlw	EE_RELAY_DELAY
 			call	read_eeprom
-			movwf	valve_delay
-			call	chk_0_99_range			
+			movwf	relay_delay
+			sublw	RELAY_DELAY_MAX
 			movlw	3			; Default valve delay 30 seconds
 			btfss	CARRY
-			movwf	valve_delay		; Set default value
+			movwf	relay_delay		; Set default value
+
+			; Restore valve maintain time
+			movlw	EE_VALVE_MAINTAIN
+			call	read_eeprom
+			movwf	valve_maintain_days
+			subwf	VALVE_MAINTAIN_MAX	; More than VALVE_MAINTAIN_MAX
+			btfss	CARRY			; Skip if <=
+			clrf	valve_maintain_days	; Default off
+			call	valve_maint_calc    ; Update initialization value
+			
+			; Restore operation mode
+			clrf	operation_mode		; Default heating
+			movlw	EE_OPERATION_MODE
+			call	read_eeprom
+			subwf	OPERATION_MODE_COOLING
+			btfsc	ZERO
+			incf	operation_mode
 			
 			; Wait until oscillator is stable
 		    	bsf	RP0
@@ -242,7 +263,7 @@ try_thermometer_rb6:	btfss	PORTB, 6
 			movlw	EE_LIGHT_SENSOR
 			call	read_eeprom
 			movwf	light_sensor_limit
-			call	chk_0_99_range			
+			sublw	LIGHT_SENSOR_MAX
 			movlw	10			; => Default 10
 			btfss	CARRY
 			movwf	light_sensor_limit	; Set default value

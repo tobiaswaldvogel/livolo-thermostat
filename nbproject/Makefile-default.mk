@@ -84,11 +84,31 @@ LDLIBSOPTIONS=
 # fixDeps replaces a bunch of sed/cat/printf statements that slow down the build
 FIXDEPS=fixDeps
 
+# The following macros may be used in the pre and post step lines
+_/_=\\
+ShExtension=.bat
+Device=PIC16F690
+ProjectDir="C:\Users\waldvogt\Documents\PIC"
+ProjectName=Livolo_thermostat
+ConfName=default
+ImagePath="dist\default\${IMAGE_TYPE}\PIC.${IMAGE_TYPE}.${OUTPUT_SUFFIX}"
+ImageDir="dist\default\${IMAGE_TYPE}"
+ImageName="PIC.${IMAGE_TYPE}.${OUTPUT_SUFFIX}"
+ifeq ($(TYPE_IMAGE), DEBUG_RUN)
+IsDebug="true"
+else
+IsDebug="false"
+endif
+
 .build-conf:  ${BUILD_SUBPROJECTS}
 ifneq ($(INFORMATION_MESSAGE), )
 	@echo $(INFORMATION_MESSAGE)
 endif
 	${MAKE}  -f nbproject/Makefile-default.mk dist/${CND_CONF}/${IMAGE_TYPE}/PIC.${IMAGE_TYPE}.${OUTPUT_SUFFIX}
+	@echo "--------------------------------------"
+	@echo "User defined post-build step: [copy ${ImagePath} ${ProjectDir}${_/_}Livolo_thermostat.hex]"
+	@copy ${ImagePath} ${ProjectDir}${_/_}Livolo_thermostat.hex
+	@echo "--------------------------------------"
 
 MP_PROCESSOR_OPTION=PIC16F690
 # ------------------------------------------------------------------------------------

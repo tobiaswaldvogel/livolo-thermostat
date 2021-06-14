@@ -7,9 +7,9 @@ psect   code
 global	touch_power_short, touch_power_long
 global	touch_plus_short, touch_minus_short
 global	touch_plus_minus_long   
-global  chk_target_temp_range, chk_offset_range, chk_0_99_range
+global  chk_target_temp_range
 ; Use
-global	enter_setup 
+global	enter_setup, touch_plus_setup, touch_minus_setup    
 global	display_temperature   
 global display_on, display_off, convert_fahrenheit   
 global read_eeprom, write_eeprom    
@@ -24,22 +24,31 @@ touch_power_short:	bcf	SIGNAL_TOUCH_POWER_SHORT
 			
 			; Invert on / off state
 			bsf	FLAG_TEMPERATURE_CHANGED
-			bsf	FLAG_VALVE_IMMEDIATE
+			bsf	FLAG_RELAY_IMMEDIATE
 
 			btfss	FLAG_DISPLAY_ENABLE
 			goto	touch_power_short_on
 
+			; Stand-by
 			; Set freeze safe temperature
 			clrf	var_timer_inactivity	; Make sure temperature is not written by this timer
-			movlw	STANDBY_TARGET_TEMPERATURE_CELSIUS
+
+			movf	operation_mode, w
+			btfsc	ZERO
+			goto	stand_by_heating
+
+stand_by_colling:	movlw	255
+			goto	enter_stand_by
+			
+stand_by_heating:	movlw	STANDBY_TARGET_TEMPERATURE_CELSIUS
 			btfsc	FLAG_FAHRENHEIT
 			call	convert_fahrenheit	; Convert to fahrenheit if required
-			movwf	target_temperature
-			
+
+enter_stand_by:		movwf	target_temperature
 			bsf	FLAG_STANDBY
 			goto	display_off
 
-touch_power_short_on:	; Restore target temperature
+touch_power_short_on:	; Restore target temperature from EEPROM
 			movlw	EE_TARGET_TEMPERATURE
 			call	read_eeprom
 			movwf	target_temperature
@@ -47,6 +56,7 @@ touch_power_short_on:	; Restore target temperature
 			bcf	FLAG_STANDBY
 			bcf	FLAG_DISPLAY_OFF
 			call	set_display_off_delay
+			bcf	FLAG_NIGHT_MODE
 			goto	display_on
 			
 ;--------------------------------------------------------- 
@@ -71,10 +81,11 @@ touch_plus_short:	bcf	SIGNAL_TOUCH_PLUS_SHORT
 			btfsc	FLAG_DISPLAY_ENABLE
 			goto	touch_plus_short_2
 			bcf	FLAG_DISPLAY_OFF
-			call	set_display_off_delay
+			bcf	FLAG_NIGHT_MODE
 			call	display_on	; Switch on the display if off
 
-touch_plus_short_2:	movf    setup_mode, w
+touch_plus_short_2:	call	set_display_off_delay
+			movf    setup_mode, w
 			btfss   ZERO
 			goto	touch_plus_setup
 
@@ -92,58 +103,6 @@ touch_plus_short_2:	movf    setup_mode, w
 			movlw	FAHRENHEIT_MAX
 			movwf	target_temperature
 			goto	touch_set_target_temp
-			
-touch_plus_setup:	addlw	-1		
-			btfss	ZERO
-			goto	touch_plus_setup_delay
-			; Offset
-			incf	temperature_offset, f
-			movf	temperature_offset, w
-			call	chk_offset_range			
-			btfsc	CARRY
-			return
-			movlw	9		; Max value
-			movwf	temperature_offset
-			return
-			
-touch_plus_setup_delay:	addlw	-1
-			btfss	ZERO
-			goto	touch_plus_setup_unit
-			; Valve delay
-			incf	valve_delay, f
-			movf	valve_delay, w
-			call	chk_0_99_range			
-			btfsc	CARRY
-			return
-			movlw	99		; Max value
-			movwf	valve_delay
-			return
-			
-touch_plus_setup_unit:	addlw	-1		; Check for SETUP_DELAY
-			btfss	ZERO
-			goto	touch_plus_setup_ls
-
-			btfss	FLAG_FAHRENHEIT
-			goto	touch_plus_setup_f
-			
-			bcf	FLAG_FAHRENHEIT
-			return
-touch_plus_setup_f:	bsf	FLAG_FAHRENHEIT
-			return
-			
-touch_plus_setup_ls:	addlw	-1		; Check for SETUP_DELAY
-			btfsc	ZERO
-			return			; Display value only
-
-			; Light sensr 
-			incf	light_sensor_limit, f
-			movf	light_sensor_limit, w
-			call	chk_0_99_range			
-			btfsc	CARRY
-			return
-			movlw	99		; Max value
-			movwf	light_sensor_limit
-			return
 
 ;--------------------------------------------------------- 
 ; Minus short
@@ -154,10 +113,11 @@ touch_minus_short:	bcf	SIGNAL_TOUCH_MINUS_SHORT
 			btfsc	FLAG_DISPLAY_ENABLE
 			goto	touch_minus_short_2
 			bcf	FLAG_DISPLAY_OFF
-			call	set_display_off_delay
+			bcf	FLAG_NIGHT_MODE
 			call	display_on	; Switch on the display if off
 			
-touch_minus_short_2:	movf    setup_mode, w
+touch_minus_short_2:	call	set_display_off_delay
+			movf    setup_mode, w
 			btfss   ZERO
 			goto	touch_minus_setup
     
@@ -176,53 +136,6 @@ touch_minus_short_2:	movf    setup_mode, w
 			movwf	target_temperature
 			goto	touch_set_target_temp
 			
-touch_minus_setup:	addlw	-1
-			btfss	ZERO
-			goto	touch_minus_setupdelay
-			; Offset
-			decf	temperature_offset, f
-			movf	temperature_offset, w
-			call	chk_offset_range			
-			btfsc	CARRY
-			return
-			movlw	-9
-			movwf	temperature_offset
-			return
-
-touch_minus_setupdelay:	addlw	-1		; Check for SETUP_DELAY
-			btfss	ZERO
-			goto	touch_minus_setup_unit
-			; Valve delay
-			decf	valve_delay, f
-			movf	valve_delay, w
-			call	chk_0_99_range			
-			btfss	CARRY
-			clrf	valve_delay	; Default 0
-			return
-
-touch_minus_setup_unit:	addlw	-1		; Check for SETUP_LS
-			btfss	ZERO
-			goto	touch_setup_minus_ls
-
-			btfss	FLAG_FAHRENHEIT
-			goto	touch_minus_setup_f
-			
-			bcf	FLAG_FAHRENHEIT
-			return
-touch_minus_setup_f:	bsf	FLAG_FAHRENHEIT
-			return
-			
-touch_setup_minus_ls:	addlw	-1
-			btfsc	ZERO
-			return			; Display value only
-
-			; Light sensor
-			decf	light_sensor_limit, f
-			movf	light_sensor_limit, w
-			call	chk_0_99_range			
-			btfss	CARRY
-			clrf	light_sensor_limit	; Default 0
-			return
 			
 ;--------------------------------------------------------- 
 ; Plus / Minus long
@@ -248,7 +161,7 @@ touch_set_target_temp:	movf	target_temperature, w
 			call	display_temperature
 
 			bsf	FLAG_TEMPERATURE_CHANGED
-			bsf	FLAG_VALVE_IMMEDIATE
+			bsf	FLAG_RELAY_IMMEDIATE
 
 			bcf	SIGNAL_TIMER_INACTIVITY
 			movlw	INACTITIVY_TIMER
@@ -288,32 +201,6 @@ chk_target_temp_rangef:	sublw	FAHRENHEIT_MAX	    ; C => <= FAHRENHEIT_MAX
 			; Restore w
 			addlw	FAHRENHEIT_MIN	    ; Restore W
 			bsf	CARRY		    ; Ok
-			return
-
-;--------------------------------------------------------- 
-; Check offset range
-; In: Value Out: Carry
-;--------------------------------------------------------- 
-chk_offset_range:	addlw	9		    ; -9 .. +9 -> 0 .. 18
-			; Check max
-			sublw	18		    ;  > 18 -> Carry clear
-			btfss	CARRY
-			return			    ; Carry clear -> Not ok
-
-			sublw	18		    ;  Restore W
-			addlw	-9
-			bsf	CARRY
-			return
-
-;--------------------------------------------------------- 
-; Check 0 .. 99 range
-; In: Value Out: Carry
-;--------------------------------------------------------- 
-chk_0_99_range:		sublw	99		    ; > 99 -> Carry clear
-			btfss	CARRY
-			return
-			sublw	99		    ; Restore W
-			bsf	CARRY
 			return
 			
 ;--------------------------------------------------------- 

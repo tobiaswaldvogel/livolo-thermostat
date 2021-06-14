@@ -3,13 +3,13 @@
 #include "one_wire.inc"
     
 ; Publish
-global	main, convert_fahrenheit, set_valve_on, failure
+global	main, convert_fahrenheit, set_relay_on, failure
 ; Use    
 global	touch_power_short, touch_power_long
 global	touch_plus_short, touch_minus_short
 global	touch_plus_minus_long
 global	timer_inactivity, timer_adc
-global	timer_valve_stop, timer_valve_start
+global	timer_relay_stop, timer_relay_start
 global  timer_valve_maint_strt, timer_valve_maint_stop
 global  timer_valve_maint, timer_keep_displ_on
 global	display_setup, display_temperature, display_decimal
@@ -44,7 +44,7 @@ main:			clrf	STATUS
 			movlw	0xff
 			movwf	current_temperature
 
-			call	set_valve_off
+			call	set_relay_off
 			call	display_on
 
 			bsf	FLAG_ONEWIRE_SELF_POWERED
@@ -104,7 +104,7 @@ main_check_signals:	clrwdt				    ;Reset watchdog
 			btfsc	SIGNAL_TIMER_ADC
 			call	timer_adc
 			btfsc	SIGNAL_TIMER_VALVE
-			call	set_valve
+			call	set_relay
 			btfsc	SIGNAL_TIMER_VALVE_MAINTAIN
 			call	timer_valve_maint
 			btfsc	SIGNAL_TIMER_KEEP_DISPLAY_ON
@@ -128,36 +128,60 @@ temp_change:		bcf	FLAG_TEMPERATURE_CHANGED
 			movf	current_temperature, w
 			call	display_temperature
 			
-temp_change_1:		btfss	FLAG_VALVE_IMMEDIATE
-			goto	temp_valve_delay
-			bcf	FLAG_VALVE_IMMEDIATE
-			goto	set_valve
+temp_change_1:		btfss	FLAG_RELAY_IMMEDIATE
+			goto	temp_relay_delay
+			bcf	FLAG_RELAY_IMMEDIATE
+			goto	set_relay
+
+temp_relay_delay:	movf	operation_mode, w
+			btfsc	ZERO
+			goto	temp_delay_heat
+
+			; Cooling mode
+			movf	current_temperature, w
+		    	subwf	target_temperature,  w	; current <= target -> CARRY
+			btfss	CARRY
+			goto	schedule_relay_on
+			goto	schedule_relay_off
 			
-temp_valve_delay:	movf	target_temperature,  w
-			subwf	current_temperature, w	; Carry => target <= current
+			; Heating mode
+temp_delay_heat:	movf	target_temperature,  w
+			subwf	current_temperature, w	;  current >= target -> CARRY
 			btfss	CARRY
-			goto	temp_target_gt_current
+			goto	schedule_relay_on	; Target not reached
 
-			btfss	VALVE
-			goto	timer_valve_stop	; No change => Stop timer
-			goto	timer_valve_start
+schedule_relay_off:	btfss	RELAY
+			goto	timer_relay_stop	; Already off
+			goto	timer_relay_start
 
-temp_target_gt_current:	btfsc	VALVE
-			goto	timer_valve_stop
-			goto	timer_valve_start
+schedule_relay_on:	btfsc	RELAY
+			goto	timer_relay_stop	; Already on
+			goto	timer_relay_start
 
 
 ;--------------------------------------------------------- 
-; Set valve relay and indicator
+; Set relay and indicator
 ;--------------------------------------------------------- 
-set_valve:		bcf	SIGNAL_TIMER_VALVE
+set_relay:		bcf	SIGNAL_TIMER_VALVE
 
-			movf	target_temperature,  w
-			subwf	current_temperature, w
+			movf	operation_mode, w
+			btfsc	ZERO
+			goto	set_relay_heating
+
+			; Cooling mode
+			movf	current_temperature, w
+		    	subwf	target_temperature,  w	; current <= target -> CARRY
 			btfss	CARRY
-			goto	set_valve_on
+			goto	set_relay_on
+			goto	set_relay_off
+			
+			; Heating mode
+set_relay_heating:	movf	target_temperature,  w
+			subwf	current_temperature, w	;  current >= target -> CARRY
+			btfss	CARRY
+			goto	set_relay_on
 
-set_valve_off:		bcf	VALVE
+set_relay_off:		bcf	RELAY
 			call	timer_valve_maint_strt
 			btfss	FLAG_DISPLAY_ENABLE
 			return			; Display off 
@@ -167,7 +191,7 @@ set_valve_off:		bcf	VALVE
 			bcf	RP0		; => lit + blue led
 			return
 
-set_valve_on:		bsf	VALVE
+set_relay_on:		bsf	RELAY
 			call	timer_valve_maint_stop
 			bcf	SIGNAL_TIMER_VALVE_MAINTAIN
 			btfss	FLAG_DISPLAY_ENABLE
@@ -260,48 +284,46 @@ flip_led_f_clear:	bcf	LED_FAHRENHEIT
 ; Approximate with  * 230 / 256 + 32 to avoid division
 ; 230 = 0b11100110    
 ;--------------------------------------------------------- 
-convert_fahrenheit:	movwf	arg_0
-			clrf	arg_1	    ; Copy
-			bcf	CARRY
-			rlf	arg_0
-			rlf	arg_1	    ; * 2
-			addwf	arg_0
-			btfsc	CARRY
-			incf	arg_1	    ; * 3
-			bcf	CARRY
-			rlf	arg_0
-			rlf	arg_1	    ; * 6
-			addwf	arg_0
-			btfsc	CARRY
-			incf	arg_1	    ; * 7
-			bcf	CARRY
-			rlf	arg_0
-			rlf	arg_1	    ; * 14
-			rlf	arg_0
-			rlf	arg_1	    ; * 28
-			rlf	arg_0
-			rlf	arg_1	    ; * 56
-			addwf	arg_0
-			btfsc	CARRY
-			incf	arg_1	    ; * 57
-			bcf	CARRY
-			rlf	arg_0
-			rlf	arg_1	    ; * 114
-			addwf	arg_0
-			btfsc	CARRY
-			incf	arg_1	    ; * 115
-			bcf	CARRY
-			rlf	arg_0
-			rlf	arg_1	    ; * 230
-			btfsc	arg_0, 7    ; Rounding
-			incf	arg_1
+convert_f_mult_1	equ	arg_0
+convert_f_mult_2_0	equ	arg_1
+convert_f_mult_2_1	equ	arg_2
+convert_f_result_0	equ	arg_3
+convert_f_result_1	equ	arg_4
 
-			movlw	32	    ; + 32
-			addwf	arg_1, w
+
+convert_fahrenheit:	movwf	convert_f_mult_2_0
+			clrf	convert_f_mult_2_1
+			movlw	230
+			movwf	convert_f_mult_1
+			clrf	convert_f_result_0
+			clrf	convert_f_result_1
+
+convert_f_loop:		bcf	CARRY
+			rrf	convert_f_mult_1
+			btfss	CARRY
+			goto	convert_f_next
+
+			movf	convert_f_mult_2_0, w
+			addwf	convert_f_result_0, f
+			movf	convert_f_mult_2_1, w
+			btfsc	CARRY
+			incfsz	convert_f_mult_2_1, w
+			addwf	convert_f_result_1, f
+
+convert_f_next:		movf	convert_f_mult_1, w	; Still bits left ?
+			btfsc   ZERO
+			goto	convert_f_offset
+
+			bcf	CARRY
+			rlf	convert_f_mult_2_0
+			rlf	convert_f_mult_2_1
+			goto	convert_f_loop
+			
+convert_f_offset:	movf	convert_f_result_1, w	; MSB = / 256
+			addlw	32
 			sublw	99	    ; Limit to 99
 			btfss	CARRY
 			movlw	99
 			btfsc	CARRY
 			sublw	99
 			return
-			

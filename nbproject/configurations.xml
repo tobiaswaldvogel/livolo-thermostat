@@ -71,8 +71,8 @@
         <makeCustomizationPreStepEnabled>false</makeCustomizationPreStepEnabled>
         <makeUseCleanTarget>false</makeUseCleanTarget>
         <makeCustomizationPreStep></makeCustomizationPreStep>
-        <makeCustomizationPostStepEnabled>false</makeCustomizationPostStepEnabled>
-        <makeCustomizationPostStep></makeCustomizationPostStep>
+        <makeCustomizationPostStepEnabled>true</makeCustomizationPostStepEnabled>
+        <makeCustomizationPostStep>copy ${ImagePath} ${ProjectDir}${_/_}Livolo_thermostat.hex</makeCustomizationPostStep>
         <makeCustomizationPutChecksumInUserID>false</makeCustomizationPutChecksumInUserID>
         <makeCustomizationEnableLongLines>false</makeCustomizationEnableLongLines>
         <makeCustomizationNormalizeHexFile>false</makeCustomizationNormalizeHexFile>
@@ -84,8 +84,6 @@
         <property key="ToolFirmwareFilePath"
                   value="Press to browse for a specific firmware version"/>
         <property key="ToolFirmwareOption.UseLatestFirmware" value="true"/>
-        <property key="debugoptions.debug-startup" value="Use system settings"/>
-        <property key="debugoptions.reset-behaviour" value="Use system settings"/>
         <property key="debugoptions.useswbreakpoints" value="false"/>
         <property key="hwtoolclock.frcindebug" value="false"/>
         <property key="memories.aux" value="false"/>

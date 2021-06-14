@@ -356,30 +356,30 @@ isr_tmr_keep_d_on:  incf    var_timer_keep_displ_on, w	; Underflow LSB ?
 timer_keep_d_on_end:
 
 		    ; 24 bit Valve delay timer
-		    movf    var_timer_valve, w
-		    iorwf   var_timer_valve + 1, w
-		    iorwf   var_timer_valve + 2, w
+		    movf    var_timer_relay, w
+		    iorwf   var_timer_relay + 1, w
+		    iorwf   var_timer_relay + 2, w
 		    btfsc   ZERO
-		    goto    timer_valve_delay_end        ; Timer is off (most likely case)
+		    goto    timer_relay_delay_end        ; Timer is off (most likely case)
 		    ; LSB
-		    decfsz  var_timer_valve, f
-		    goto    timer_valve_delay
+		    decfsz  var_timer_relay, f
+		    goto    timer_relay_delay
 		    ; Zero => Check if timer finished
-		    movf    var_timer_valve + 1, w
-		    iorwf   var_timer_valve + 2, w
+		    movf    var_timer_relay + 1, w
+		    iorwf   var_timer_relay + 2, w
 		    btfss   ZERO
-		    goto    timer_valve_delay_end
+		    goto    timer_relay_delay_end
 		    ; Timer finished
 		    bsf	    SIGNAL_TIMER_VALVE
-		    goto    timer_valve_delay_end
+		    goto    timer_relay_delay_end
 		    ; Handle underflow
-timer_valve_delay:  incfsz  var_timer_valve, w		; Underflow LSB ?
-		    goto    timer_valve_delay_end	; No => done
-		    decf    var_timer_valve + 1, f
-		    incf    var_timer_valve + 1, w	; Underflow byte 1 ?
+timer_relay_delay:  incfsz  var_timer_relay, w		; Underflow LSB ?
+		    goto    timer_relay_delay_end	; No => done
+		    decf    var_timer_relay + 1, f
+		    incf    var_timer_relay + 1, w	; Underflow byte 1 ?
 		    btfsc   ZERO			; Skip if not
-		    decf    var_timer_valve + 2, f	; Underflow cannot occur
-timer_valve_delay_end:
+		    decf    var_timer_relay + 2, f	; Underflow cannot occur
+timer_relay_delay_end:
 		    
 		    ; 32 bit timer for valve maintenance
 		    movf    var_timer_valve_maint, w
