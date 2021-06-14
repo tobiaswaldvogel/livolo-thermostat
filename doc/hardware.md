@@ -58,6 +58,6 @@ So the frequency of this oscillator depends on the capacitor and timer 0 is coun
 There are two DS18B20 thermometers built into this thermostat. One connected RB4 (the external sensor the one beneath the holes) and another one near the power train connected to RB6 (not really useful)
 
 [Back to README](/README.md)  
-[Hardware modifications](doc/hardware_mod.md)  
-[Firmware update](doc/programmer.md)  
-[User mannual](doc/user_manual.md)  
+[Hardware modifications](/doc/hardware_mod.md)  
+[Firmware update](/doc/programmer.md)  
+[User mannual](/doc/user_manual.md)  
