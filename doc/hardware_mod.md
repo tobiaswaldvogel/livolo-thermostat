@@ -25,8 +25,14 @@ Front view with painted thermometer
 <img src="mod_thermometer_front.jpg"/>
 
 ## Light sensor
-The PIC16F690 has a built-in A/D converter, so we can simply use a LDR for it. I used the GM5516 but any other will do as well. As there is no free pin left best solution is just removing the internal thermometer next to the power train. It has no real use.  
-But unfortunately this pin RB6 is one of the few which cannot be used with the A/D converted but RB4 can be used. So we just solder the thermometer to RB6 and the light sensor to RB4.
+The PIC16F690 has a built-in A/D converter, so we can simply use a LDR for it. I used the GM5516 but any other will do as well. As there is no free pin left best solution is just removing the internal thermometer next to the electrical connection. It has no real use.  
+But unfortunately this pin RB6 is one of the few which cannot be used with the A/D converted but RB4 can be used. So we just solder the thermometer to RB6 and the light sensor to RB4. The other end of the LDR goes to Vss. There is already a 4k7 pull-up resistor connected to RB4 and RB6, so we get a light dependant voltage divider. For Vss we can just use the left connection of the internal thermometer, which we just removed.
+
+```
+         4k7                            LDR
+Vdd ----/\/\-----  RB4 ( pin 13)  ------/\/\ ------- Vss
+```
+
 The firmware automatically detects this. First it probes the thermometer on RB4 and if it is not present then it tries RB6 and assumes that a light sensor is present on RB4.  
 <img src="mod_thermometer_light_sensor.jpg"/>  
 The light sensor is placed top left.  
