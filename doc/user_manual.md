@@ -52,3 +52,9 @@ The current reading of the light sensor.
 
 ### Light sensor threshold (Only if light sensor is present, both digits flashing, C and F off)
 Threshold for turning the display off (night mode). The light sensor value from the step before can be used to find a good setting.  
+
+
+[Back to README](/README.md)  
+[Hardware description](/doc/hardware.md)  
+[Hardware modifications](/doc/hardware_mod.md)  
+[Firmware update](/doc/programmer.md)  
