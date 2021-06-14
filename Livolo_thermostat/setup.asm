@@ -163,12 +163,17 @@ display_setup_unit:	addlw	-1
 			goto	display_setup_maintain
 
 			; Display unit
-			btfss   FLAG_FAHRENHEIT
-			bsf	LED_CELSIUS
 			btfsc   FLAG_FAHRENHEIT
-			bsf	LED_FAHRENHEIT
+			goto	display_setup_unit_f
+			
+			bsf	LED_CELSIUS
+			bcf	LED_FAHRENHEIT
 			return
 
+display_setup_unit_f:	bsf	LED_FAHRENHEIT
+			bcf	LED_CELSIUS
+			return
+			
 display_setup_maintain:	addlw	-1
 			btfss	ZERO
 			goto	display_setup_op_mode
@@ -249,7 +254,10 @@ touch_plus_setup_unit:	addlw	-1		; Check for SETUP_DELAY
 			goto	touch_plus_setup_f
 			
 			bcf	FLAG_FAHRENHEIT
+			movlw	0feh		; Clear LSB (0.5 degree for Celsius)
+			andwf	target_temperature, f
 			return
+
 touch_plus_setup_f:	bsf	FLAG_FAHRENHEIT
 			return
 
@@ -324,7 +332,10 @@ touch_minus_setup_unit:	addlw	-1		; Check for SETUP_LS
 			goto	touch_minus_setup_f
 			
 			bcf	FLAG_FAHRENHEIT
+			movlw	0feh		; Clear LSB (0.5 degree for Celsius)
+			andwf	target_temperature, f
 			return
+
 touch_minus_setup_f:	bsf	FLAG_FAHRENHEIT
 			return
 			

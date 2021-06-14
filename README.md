@@ -10,7 +10,8 @@ If the measured temperature is just between the target temperature and one degre
 * No valve maintenance function  
 If the heating is not in use (summer) then it is best practice to open the valves every week for a few minutes to avoid them from getting stuck. Unfortunately, this is not implemented.
 * Unsuitable for bedroom  
-For a bedroom the display is too bright and won't let you sleep (me at least)
+For a bedroom the display is too bright and won't let you sleep (me at least)  
+* Cannot be used for cooling (i.e. line active when current temperature is above target temperature)
 ## Solution
 Probably the easiest solution would be just to get other thermostats but if you bought already several of them and you using other Livolo switches there is no suitable replacement, which would look good and fit into the 40x40mm. Therefore, I started thinking about modifying it and considered writing a new firmware.
 ### Hardware modification (thermometer)

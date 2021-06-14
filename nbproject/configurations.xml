@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configurationDescriptor version="65">
   <logicalFolder name="root" displayName="root" projectFiles="true">
+    <logicalFolder name="f1" displayName="Documentation" projectFiles="true">
+      <itemPath>README.md</itemPath>
+      <itemPath>doc/hardware.md</itemPath>
+      <itemPath>doc/hardware_mod.md</itemPath>
+      <itemPath>doc/user_manual.md</itemPath>
+    </logicalFolder>
     <logicalFolder name="HeaderFiles"
                    displayName="Header Files"
                    projectFiles="true">
@@ -32,7 +38,7 @@
     </logicalFolder>
   </logicalFolder>
   <sourceRootList>
-    <Elem>Livolo_thermostat</Elem>
+    <Elem>.</Elem>
   </sourceRootList>
   <projectmakefile>Makefile</projectmakefile>
   <confs>

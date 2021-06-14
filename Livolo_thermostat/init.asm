@@ -179,7 +179,7 @@ init_clear_bank0:	clrf	INDF
 			movwf	target_temperature
 			call	chk_target_temp_range
 			btfsc	CARRY
-			goto	target_temp_offset  ; Carry set => valid
+			goto	target_temp_align	; Carry set => valid
 			
 			movlw	CELSIUS_DEFAULT
 			btfsc	FLAG_FAHRENHEIT
@@ -191,6 +191,12 @@ init_clear_bank0:	clrf	INDF
 			movlw	EE_TARGET_TEMPERATURE
 			call	write_eeprom
 
+			; In case of Celcius clean bit 0
+			;  as we are working with 0.5 degree units
+target_temp_align:	movlw	0feh
+			btfss	FLAG_FAHRENHEIT
+			andwf	target_temperature, f
+			
 			; Restore temperature offset
 target_temp_offset:	movlw	EE_TEMPERATURE_OFFSET
 			call	read_eeprom
