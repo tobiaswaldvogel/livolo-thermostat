@@ -43,5 +43,6 @@ For my bedroom, I wanted the display to turn off automatically in the darkness. 
 ## Getting started
 [Hardware description](doc/hardware.md)  
 [Hardware modifications](doc/hardware_mod.md)  
+[Firmware update](doc/programmer.md)
 [User mannual](doc/user_manual.md)
 
