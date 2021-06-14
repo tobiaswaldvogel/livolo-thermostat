@@ -6,6 +6,10 @@ global	one_wire_reset, one_wire_rx, one_wire_tx
 
 psect   code
 
+bit_counter		equ	arg_0
+presence_detect		equ	arg_1
+tx_data			equ	arg_1		
+   
 ; Waits time in us
 WAIT			macro	TIME    
 			;   Wait 500 us
@@ -36,7 +40,7 @@ one_wire_tx:		btfss	FLAG_ONEWIRE_RB6
 ;--------------------------------------------------------- 
 ; OneWire routines for RB4
 ;--------------------------------------------------------- 
-one_wire_reset_rb4:	clrf	arg_1		; Presence detect
+one_wire_reset_rb4:	clrf	presence_detect	; Presence detect
 			bcf	GIE
 			bsf	RP0			   
 			bsf	TRISB, 4	; DQ High
@@ -51,20 +55,20 @@ one_wire_reset_rb4:	clrf	arg_1		; Presence detect
 			bsf	TRISB, 4	; DQ high
 			bcf	RP0
 			
-			WAIT	70              ; Release line and wait 70us for PD Pulse
+			WAIT	70		    ; Release line and wait 70us for PD Pulse
 
-			btfss	PORTB, 4	; Read for a PD Pulse
-			incf	arg_1, f	; Indicate PD
+			btfss	PORTB, 4	    ; Read for a PD Pulse
+			incf	presence_detect, f  ; Indicate PD
 			
 			bsf	GIE
-			WAIT	430		; Wait 430us after PD Pulse
-			rrf	arg_1, f	; Rotate bit 0 (PD)to Carry
+			WAIT	430		    ; Wait 430us after PD Pulse
+			rrf	presence_detect, f  ; Rotate bit 0 (PD)to Carry
 			retlw	0
 
 ; FSR points to byte to send, assume bank 0			
-one_wire_tx_rb4:	movwf	arg_1		; Send data
+one_wire_tx_rb4:	movwf	tx_data		; Send data
 			movlw	8		; Bit counter
-			movwf	arg_0
+			movwf	bit_counter
 one_wire_tx_loop_rb4:	bcf	GIE
 			bcf	PORTB, 4	; DQ low
 			bsf	RP0		; Bank 1
@@ -73,14 +77,14 @@ one_wire_tx_loop_rb4:	bcf	GIE
 			nop			; hold for 3us
 			nop
 			nop
-			rrf	arg_1, f	; Next bit of send data in Carry
+			rrf	tx_data, f	; Next bit of send data in Carry
 			bsf	RP0
 			btfsc	CARRY		; Keep low  if bit 0
 			bsf	TRISB, 4	; Set High if bit 1
 			WAIT	60
 			bsf	TRISB, 4	; High
 			bcf	RP0		; bank 0
-			decf	arg_0, f	; Bit counter
+			decf	bit_counter, f	; Bit counter
 			btfss	ZERO		; if this is not the last bit we
 			bsf	GIE		;   can enable interrupts already
 						; 2 us recovery
@@ -104,7 +108,7 @@ one_wire_tx_ret_rb4:	bsf	GIE
 
 ; FSR points to receive location			
 one_wire_rx_rb4:	movlw	8
-			movwf	arg_0		; Bit counter
+			movwf	bit_counter	; Bit counter
 one_wire_rx_loop_rb4:	bcf	GIE
 			bcf	PORTB, 4	; DQ low
 			bsf	RP0
@@ -127,14 +131,14 @@ one_wire_rx_loop_rb4:	bcf	GIE
 			addlw	-1		; C = DQ
 			rrf	INDF, f
 			WAIT	50
-			decfsz	arg_0, f	; Bit counter
+			decfsz	bit_counter, f	; Bit counter
 			goto	one_wire_rx_loop_rb4
 			retlw	0
    
 ;--------------------------------------------------------- 
 ; OneWire routines for RB6
 ;--------------------------------------------------------- 
-one_wire_reset_rb6:	clrf	arg_1		; Presence detect
+one_wire_reset_rb6:	clrf	presence_detect	; Presence detect
 			bcf	GIE
 			bsf	RP0			   
 			bsf	TRISB, 6	; DQ High
@@ -151,18 +155,18 @@ one_wire_reset_rb6:	clrf	arg_1		; Presence detect
 			
 			WAIT	70              ; Release line and wait 70us for PD Pulse
 
-			btfss	PORTB, 6	; Read for a PD Pulse
-			incf	arg_1, f	; Indicate PD
+			btfss	PORTB, 6	    ; Read for a PD Pulse
+			incf	presence_detect, f  ; Indicate PD
 			
 			bsf	GIE
-			WAIT	430		; Wait 430us after PD Pulse
-			rrf	arg_1, f	; Rotate bit 0 (PD)to Carry
+			WAIT	430		    ; Wait 430us after PD Pulse
+			rrf	presence_detect, f  ; Rotate bit 0 (PD)to Carry
 			retlw	0
 
 ; FSR points to byte to send, assume bank 0			
-one_wire_tx_rb6:	movwf	arg_1		; Send data
+one_wire_tx_rb6:	movwf	tx_data		; Send data
 			movlw	8		; Bit counter
-			movwf	arg_0
+			movwf	bit_counter
 one_wire_tx_loop_rb6:	bcf	GIE
 			bcf	PORTB, 6	; DQ low
 			bsf	RP0		; Bank 1
@@ -171,14 +175,14 @@ one_wire_tx_loop_rb6:	bcf	GIE
 			nop			; hold for 3us
 			nop
 			nop
-			rrf	arg_1, f	; Next bit of send data in Carry
+			rrf	tx_data, f	; Next bit of send data in Carry
 			bsf	RP0
 			btfsc	CARRY		; Keep low  if bit 0
 			bsf	TRISB, 6	; Set High if bit 1
 			WAIT	60
 			bsf	TRISB, 6	; High
 			bcf	RP0		; bank 0
-			decf	arg_0, f	; Bit counter
+			decf	bit_counter, f	; Bit counter
 			btfss	ZERO		; if this is not the last bit we
 			bsf	GIE		;   can enable interrupts already
 						; 2 us recovery
@@ -202,7 +206,7 @@ one_wire_tx_ret_rb6:	bsf	GIE
 
 ; FSR points to receive location			
 one_wire_rx_rb6:	movlw	8
-			movwf	arg_0		; Bit counter
+			movwf	bit_counter	; Bit counter
 one_wire_rx_loop_rb6:	bcf	GIE
 			bcf	PORTB, 6	; DQ low
 			bsf	RP0
@@ -225,6 +229,6 @@ one_wire_rx_loop_rb6:	bcf	GIE
 			addlw	-1		; C = DQ
 			rrf	INDF, f
 			WAIT	50
-			decfsz	arg_0, f	; Bit counter
+			decfsz	bit_counter, f	; Bit counter
 			goto	one_wire_rx_loop_rb6
 			retlw	0

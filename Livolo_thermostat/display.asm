@@ -17,7 +17,7 @@ display_temperature:	btfsc	FLAG_FAHRENHEIT
 			goto	display_decimal
 
 display_temperature_f:  sublw	FAHRENHEIT_MAX
-			btfss	CARRY	; C => <= FAHRENHEIT_MAX
+			btfss	CARRY	; <= FAHRENHEIT_MAX -> Carry
 			movlw	0	; Limit to FAHRENHEIT_MAX - 0
 			sublw	FAHRENHEIT_MAX	; Restore value before
 			goto	display_decimal
@@ -27,25 +27,25 @@ display_temperature_f:  sublw	FAHRENHEIT_MAX
 ;--------------------------------------------------------- 
 display_decimal:	clrf	arg_0
 			
-			addlw	-80	; => Carry set if if >= 80
+			addlw	-80	; >= 80 -> Carry
 			btfsc	CARRY
 			bsf	arg_0, 3
 			btfss	CARRY
 			addlw	80
 			
-			addlw	-40	; => Carry set if if >= 40
+			addlw	-40	; >= 40 -> Carry
 			btfsc	CARRY
 			bsf	arg_0, 2
 			btfss	CARRY
 			addlw	40
 			
-			addlw	-20	; => Carry set if if >= 20
+			addlw	-20	; >= 20 -> Carry
 			btfsc	CARRY
 			bsf	arg_0, 1
 			btfss	CARRY
 			addlw	20
 			
-			addlw	-10	; => Carry set if if >= 10
+			addlw	-10	; >= 10 -> Carry
 			btfsc	CARRY
 			bsf	arg_0, 0
 			btfss	CARRY
@@ -69,7 +69,7 @@ display_on:		bsf	FLAG_DISPLAY_ENABLE
 			btfss	FLAG_FAHRENHEIT
 			bcf	LED_FAHRENHEIT
     
-			btfsc	RELAY		; Ventil offen ?
+			btfsc	RELAY		; Relay active ?
 			goto	display_on_relay
 			bsf	RP0
 			bsf	LED_POWER	; TRIS -> input
@@ -95,4 +95,3 @@ display_off:		bcf	FLAG_DISPLAY_ENABLE
 			bcf	RP0
 			bcf	LED_POWER	; => only blue led
 			return
-			
