@@ -43,8 +43,8 @@ Automatic valve maintenance opens the valve periodically for 5 minutes, in order
 The range is from 0 to 14 days, whereas 0 means off.
 
 ### Operation mode (Right digit and F flashing, C off)
-0 - Heating       Line active when current temperature is below the target temperature  
-1 - Cooling       Line active when current temperature is above the target temperature  
+0 - Heating, Line active when current temperature is below the target temperature  
+1 - Cooling, Line active when current temperature is above the target temperature  
 
 ### Light sensor value (Only if light sensor is present, both digits and C and F flashing)
 The current reading of the light sensor.  
