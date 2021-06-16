@@ -1,4 +1,6 @@
-nbproject/private
+nbproject/*
+!nbproject/project.xml
+!nbproject/configurations.xml
 build
 debug
 dist
