@@ -52,10 +52,11 @@
 TIMER0_RELOAD		    equ	128	; Counter for cap sensor oscillator
 ADC_TIMER_RELOAD	    equ	15	; ADC measure frequency for light sensor ( in 20ms units)
 
-INACTITIVY_TIMER	    equ 50 * 2	; Display time for target temperature (in 20ms units) = 2s
+TARGET_TEMPERATURE_TIMER    equ 50 * 4	; Display time for target temperature (in 20ms units) = 2s
 KEEP_DISPLAY_ON_TIMER	    equ 50 * 10	; Delay after a touch event before the display can be switched off again
 VALVE_MAINTENANCE	    equ 50 * 60 * 60 * 24 * 7	    ; 20ms units = 7 days
 VALVE_MAINTENANCE_OPEN	    equ	50 * 60 * 5		    ; 20ms units = 5 minutes
+TOUCH_REPEAT		    equ 5	; Repeat time for touch events 100ms	    
 	    
 CELSIUS_MIN		    equ (5 << 1)
 CELSIUS_DEFAULT		    equ (23 << 1)
@@ -95,14 +96,15 @@ ERROR_THERMOMETER_NOT_PRESENT_RB6   equ 3
     
 global  isr_w, isr_status, isr_fsr
 global	arg_0, arg_1, arg_2, arg_3, arg_4, arg_5, arg_6, arg_7 
-global	signal_touch, signal_timer		
+global	signal_touch, signal_release, signal_timer		
 global	flags1, flags2, setup_mode
 		
 global	disp_l, disp_r
 global  timer50hz
-global	var_timer_thermometer, var_timer_adc, var_timer_inactivity
+global	var_timer_thermometer, var_timer_adc, var_timer_target_temp
 global  var_timer_relay, var_timer_valve_maint, var_timer_keep_displ_on
 global	timer_valve_maint_mult, var_timer_valve_maint_set
+global  var_timer_touch_repeat
    
 global	target_temperature, relay_delay, temperature_offset
 global	current_temperature, light_sensor_limit, light_sensor_value, light_sensor_counter
@@ -122,14 +124,19 @@ global  EE_VALVE_MAINTAIN, EE_OPERATION_MODE
 #define SIGNAL_TOUCH_POWER_LONG		signal_touch, 5
 #define SIGNAL_TOUCH_PLUS_LONG		signal_touch, 6
 
+#define SIGNAL_RELEASE_MINUS		signal_release, 0
+#define SIGNAL_RELEASE_POWER		signal_release, 1
+#define	SIGNAL_RELEASE_PLUS		signal_release, 2
+   
 ; Timer signals   
-#define SIGNAL_TIMER_INACTIVITY		signal_timer, 0
+#define SIGNAL_TIMER_TARGET_TEMPERATURE	signal_timer, 0
 #define SIGNAL_TIMER_THERMOMETER	signal_timer, 1
 #define SIGNAL_TIMER_VALVE		signal_timer, 2
 #define SIGNAL_TIMER_ADC		signal_timer, 3
 #define	SIGNAL_TIMER_VALVE_MAINTAIN	signal_timer, 4
 #define SIGNAL_TIMER_KEEP_DISPLAY_ON    signal_timer, 5   
-  
+#define SIGNAL_TIMER_TOUCH_REPEAT       signal_timer, 6
+   
 #define FLAG_TMR2_INT_EVEN	    flags1, 0
 #define FLAG_FAHRENHEIT		    flags1, 1
 //#define FLAG_VALVE_STATUS	    flags1, 2
@@ -137,6 +144,7 @@ global  EE_VALVE_MAINTAIN, EE_OPERATION_MODE
 #define FLAG_RELAY_IMMEDIATE	    flags1, 4
 #define FLAG_ONEWIRE_RB6	    flags1, 5
 #define FLAG_ONEWIRE_SELF_POWERED   flags1, 6
+#define	FLAG_HAS_LIGHT_SENSOR	    flags1, 7
 
 ; Display / Stand-by flags   
 #define FLAG_DISPLAY_ENABLE	    flags2, 0

@@ -95,8 +95,6 @@ enter_setup_op_mode:	addlw	-1
 			movlw	EE_OPERATION_MODE
 			call	write_eeprom
 			; Switch to light sensor / End setup
-			btfss	FLAG_ONEWIRE_RB6
-			goto	leave_setup	    ; No light sensor
 			incf	setup_mode, f
 			return
 			

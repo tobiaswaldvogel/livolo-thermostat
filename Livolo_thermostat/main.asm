@@ -3,12 +3,14 @@
 #include "one_wire.inc"
     
 ; Publish
-global	main, convert_fahrenheit, set_relay_on, failure
+global	main, convert_fahrenheit, set_relay_on, failure, day_night_mode
 ; Use    
 global	touch_power_short, touch_power_long
-global	touch_plus_short, touch_minus_short
-global	touch_plus_minus_long
-global	timer_inactivity, timer_adc
+global	touch_plus_short,  touch_plus_long
+global  touch_minus_short, touch_minus_long
+global	touch_enter_setup
+global  touch_repeat, touch_repeat_stop   
+global	timer_target_temp, timer_adc
 global	timer_relay_stop, timer_relay_start
 global  timer_valve_maint_strt, timer_valve_maint_stop
 global  timer_valve_maint, timer_keep_displ_on
@@ -47,7 +49,7 @@ main:			clrf	STATUS
 			call	set_relay_off
 			call	display_on
 
-			bsf	FLAG_ONEWIRE_SELF_POWERED
+main_detect_power_mode:	bsf	FLAG_ONEWIRE_SELF_POWERED
 			; Determine thermometer power mode
 			call	one_wire_reset
 			btfss	CARRY
@@ -79,8 +81,11 @@ main:			clrf	STATUS
 		
 			call	measure_temperature
 			
+			; Activate a watchdog with prescaler 2^16 
+			; as the clock source is 31khz this is ~ 2s
+			; Min prescaler is 2^5
 			bsf	RP0
-			movlw	0b01101			    ; Watchdog on, 1: 2048 ~ 66ms
+			movlw	((16 - 5) << WDTCON_WDTPS_POSITION) | (1 << WDTCON_SWDTEN_POSN)
 			movwf	WDTCON
 			bcf	RP0
 
@@ -91,14 +96,29 @@ main_check_signals:	clrwdt				    ;Reset watchdog
 			call	touch_power_long
 			btfsc	SIGNAL_TOUCH_PLUS_SHORT
 			call	touch_plus_short
-			btfsc	SIGNAL_TOUCH_PLUS_LONG
-			call	touch_plus_minus_long
 			btfsc	SIGNAL_TOUCH_MINUS_SHORT
 			call	touch_minus_short
+			
+			; Long touch release
+			movf	signal_release, w
+			btfss   ZERO
+			call	touch_repeat_stop
+
+			btfsc	SIGNAL_TIMER_TOUCH_REPEAT
+			call	touch_repeat
+			
+			; Repeat timer running for long events ?
+			movf    var_timer_touch_repeat, w
+			btfss   ZERO
+			goto    main_timer_signals
+			
+			btfsc	SIGNAL_TOUCH_PLUS_LONG
+			call	touch_plus_long
 			btfsc	SIGNAL_TOUCH_MINUS_LONG
-			call	touch_plus_minus_long
-			btfsc	SIGNAL_TIMER_INACTIVITY
-			call	timer_inactivity
+			call	touch_minus_long
+
+main_timer_signals:	btfsc	SIGNAL_TIMER_TARGET_TEMPERATURE
+			call	timer_target_temp
 			btfsc	SIGNAL_TIMER_THERMOMETER
 			call	read_temperature
 			btfsc	SIGNAL_TIMER_ADC
@@ -113,16 +133,75 @@ main_check_signals:	clrwdt				    ;Reset watchdog
 			movf    setup_mode, w
 			btfss   ZERO
 			call	display_setup			
+
+			movf	var_timer_target_temp, w	; Flash unit if displaying target temperature
+			btfss	ZERO
+			call	flash_unit
+			
+			btfss	FLAG_HAS_LIGHT_SENSOR
+			call	day_night_mode	; Set day/night if no sensor
 			
 			btfsc	FLAG_TEMPERATURE_CHANGED
 			call	temp_change
 			goto	main_check_signals
 
 ;--------------------------------------------------------- 
+; Flash unit symbol
+;--------------------------------------------------------- 
+flash_unit:		movf	timer50hz, w
+			addlw	-10
+			btfss	CARRY
+			goto	flash_unit_blank
+
+			btfss	FLAG_FAHRENHEIT
+			bsf	LED_CELSIUS
+			btfsc	FLAG_FAHRENHEIT
+			bsf	LED_FAHRENHEIT
+			return
+			
+flash_unit_blank:	bcf	LED_CELSIUS
+			bcf	LED_FAHRENHEIT
+			return
+
+;--------------------------------------------------------- 
+; Set day / night mode
+;--------------------------------------------------------- 
+day_night_mode:		movf	light_sensor_value, w
+			subwf	light_sensor_limit, w
+			btfsc	CARRY
+			goto	day_night_mode_night
+
+			btfss	FLAG_NIGHT_MODE
+			return	; Already day mode
+			btfsc	FLAG_STANDBY
+			return	; Skip in stand-by
+			btfsc	FLAG_DISPLAY_OFF
+			return	; Skip if manually switched off
+
+			bcf	FLAG_NIGHT_MODE
+			btfss	FLAG_DISPLAY_ENABLE
+			call	display_on
+			return
+			
+day_night_mode_night:	btfsc	FLAG_KEEP_DISPLAY_ON
+			return
+			btfsc	FLAG_NIGHT_MODE
+			return	;Already in night mode
+			
+			movf	setup_mode, w
+			btfss	ZERO
+			return				; Skip in setup
+			
+			bsf	FLAG_NIGHT_MODE
+			btfsc	FLAG_DISPLAY_ENABLE	; Switch display off if on
+			call	display_off
+			return
+			
+;--------------------------------------------------------- 
 ; Evaluate temperature or target change
 ;--------------------------------------------------------- 
 temp_change:		bcf	FLAG_TEMPERATURE_CHANGED
-			movf	var_timer_inactivity, w
+			movf	var_timer_target_temp, w
 			btfss	ZERO
 			goto	temp_change_1		; Don't display if inactivity timer active
 			movf	current_temperature, w

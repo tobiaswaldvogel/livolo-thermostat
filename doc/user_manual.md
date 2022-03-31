@@ -1,8 +1,11 @@
 # User manual
 ## Temperature
 The temperature can be adjusted by touching "+" or "-".  
+The first touch just displays the current target temperature and subsequent touches change it.  
 <img src="valve_off.jpg"/>  
-After 2 seconds the display will display again the current temperature  
+The temperature unit flashes to indicate that the target temperature is displayed  
+After 4 seconds the display will display again the current temperature  
+
 The blue circle indicates that the heating/cooling is currently off.  
 When the heating/cooling is active the indicator will turn red.  
 ## Stand by
@@ -46,11 +49,11 @@ The range is from 0 to 14 days, whereas 0 means off.
 0 - Heating, Line active when current temperature is below the target temperature  
 1 - Cooling, Line active when current temperature is above the target temperature  
 
-### Light sensor value (Only if light sensor is present, both digits and C and F flashing)
-The current reading of the light sensor.  
+### Light sensor value (Both digits and C and F flashing)
+The current reading of the light sensor. If no sensor is present then it defaults to 50  
 <img src="light_sensor_status.jpg"/>
 
-### Light sensor threshold (Only if light sensor is present, both digits flashing, C and F off)
+### Light sensor threshold (Both digits flashing, C and F off)
 Threshold for turning the display off (night mode). The light sensor value from the step before can be used to find a good setting.  
 
 

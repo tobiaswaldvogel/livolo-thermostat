@@ -258,7 +258,7 @@ cap_sensor_measure: clrf    TMR1H	    ; Start next measure
 ; Timer 2 interrupt
 ; Running every 10ms (100Hz)		    
 ;--------------------------------------------------------- 
-isr_timer2:	    bcf	    TMR2IF	    ; Acknoledge interrupe
+isr_timer2:	    bcf	    TMR2IF	    ; Acknoledge interrupt
 		    movf    FSR, w
 		    movwf   isr_fsr	    ; Save FSR register
 
@@ -307,6 +307,15 @@ display_end:
 		    btfsc   CARRY
 		    clrf    timer50hz
 
+		    ; 8 bit Timer for touch repeat events
+		    movf    var_timer_touch_repeat, w
+		    btfsc   ZERO
+		    goto    timer_touch_repeat_off	; Timer is off
+		    decf    var_timer_touch_repeat, f
+		    btfsc   ZERO
+		    bsf	    SIGNAL_TIMER_TOUCH_REPEAT
+timer_touch_repeat_off:
+		    
 		    ; 8 bit Timer for temperature measurement
 		    movf    var_timer_thermometer, w
 		    btfsc   ZERO
@@ -325,14 +334,14 @@ timer_therm_off:
 		    bsf	    SIGNAL_TIMER_ADC
 timer_adc_off:
 		    
-		    ; 8 bit Display inactitivy timer
-		    movf    var_timer_inactivity, w
+		    ; 8 bit Display target temperature timer
+		    movf    var_timer_target_temp, w
 		    btfsc   ZERO
-		    goto    timer_inactivity_off	; Timer is off
-		    decf    var_timer_inactivity, f
+		    goto    timer_target_temp_off	; Timer is off
+		    decf    var_timer_target_temp, f
 		    btfsc   ZERO
-		    bsf	    SIGNAL_TIMER_INACTIVITY
-timer_inactivity_off:
+		    bsf	    SIGNAL_TIMER_TARGET_TEMPERATURE
+timer_target_temp_off:
 
 		    ; 16 bit Keep display on timer
 		    movf    var_timer_keep_displ_on, w
@@ -436,10 +445,14 @@ sensor_state:	    movf    sensor_state_mask, w
 
 		    clrf    INDF		; clear hold time
 		    addlw   -LONG_TOUCH		; was this a long touch ?
-		    btfsc   CARRY
+		    btfss   CARRY
+		    goto    sensor_short	; no => check if short touch
+		    
+		    movf    sensor_state_mask, w
+		    iorwf   signal_release, f	; set released signal
 		    goto    sensor_next
 
-		    addlw   LONG_TOUCH - MIN_TOUCH  ; Minimum touch time reached ?
+sensor_short:	    addlw   LONG_TOUCH - MIN_TOUCH  ; Minimum touch time reached ?
 		    btfss   CARRY
 		    goto    sensor_next		; Ignore if too short
 		    
@@ -463,6 +476,7 @@ sensor_hold:	    incf    INDF, w
 		    movf    sensor_state_mask, w
 		    xorlw   0ffh
 		    andwf   signal_touch, f	; and clear the short signal
+		    andwf   signal_release, f	; and clear the release signal
 
 		    movlw   0ffh
 		    movwf   INDF		; Set hold to 255

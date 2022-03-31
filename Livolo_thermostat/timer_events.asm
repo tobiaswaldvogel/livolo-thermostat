@@ -4,7 +4,7 @@
 psect   code
 
 ; Publish    
-global	timer_inactivity
+global	timer_target_temp
 global	timer_relay_stop, timer_relay_start
 global  timer_valve_maint_strt, timer_valve_maint_stop, timer_valve_maint
 global  valve_maint_calc   
@@ -17,7 +17,7 @@ global	set_relay_on
 ;--------------------------------------------------------- 
 ; Timer inactivity
 ;--------------------------------------------------------- 
-timer_inactivity:	bcf	SIGNAL_TIMER_INACTIVITY
+timer_target_temp:	bcf	SIGNAL_TIMER_TARGET_TEMPERATURE
 			; Save new target temperature to EEPROM
 			movf	target_temperature, w
 			movwf	arg_0
@@ -26,7 +26,8 @@ timer_inactivity:	bcf	SIGNAL_TIMER_INACTIVITY
 			
 			; Display current temperature again
 			movf	current_temperature, w
-			goto	display_temperature
+			call	display_temperature
+			goto	display_on		; Restore Unit
     
 ;--------------------------------------------------------- 
 ; Start valve delay timer

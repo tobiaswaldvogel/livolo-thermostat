@@ -11,15 +11,17 @@ setup_mode:		    ds	1
 timer50hz:		    ds	1    
 var_timer_thermometer:	    ds	1   ; Timer for thermometer sampling
 var_timer_adc:		    ds	1   ; Timer for ADC (light sensor)
-var_timer_inactivity:	    ds	1   ; Timer for displaying current temperature again after '+'/'-'
+var_timer_target_temp:	    ds	1   ; Timer for displaying current temperature again after '+'/'-'
 var_timer_relay:	    ds	3
 var_timer_valve_maint:	    ds	4   ; Timer for valve maintenance    
 var_timer_valve_maint_set:  ds	4   ; Value for intializing maintenance timer
 timer_valve_maint_mult:	    ds	4   ; Temporary variable for calculating var_timer_valve_maint_set
     
 var_timer_keep_displ_on:    ds	2   ; Timer for keeping the display on after touching a sensor    
-
+var_timer_touch_repeat:	    ds	1   ; Timer for long press repeat
+    
 signal_touch:		    ds	1   ; Signals for touch events
+signal_release:		    ds	1   ; Signals for release events
 signal_timer:		    ds	1   ; Signals for timer events    
 
 current_temperature:	    ds	1   ; Current temperature in 0.5 Celsius / Fahrenheit

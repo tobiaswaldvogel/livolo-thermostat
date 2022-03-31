@@ -5,8 +5,10 @@ psect   code
 
 ; Publish    
 global	touch_power_short, touch_power_long
-global	touch_plus_short, touch_minus_short
-global	touch_plus_minus_long   
+global	touch_plus_short,  touch_plus_long
+global  touch_minus_short, touch_minus_long
+global	touch_enter_setup
+global  touch_repeat, touch_repeat_stop   
 global  chk_target_temp_range
 ; Use
 global	enter_setup, touch_plus_setup, touch_minus_setup    
@@ -31,7 +33,7 @@ touch_power_short:	bcf	SIGNAL_TOUCH_POWER_SHORT
 
 			; Stand-by
 			; Set freeze safe temperature
-			clrf	var_timer_inactivity	; Make sure temperature is not written by this timer
+			clrf	var_timer_target_temp	; Make sure temperature is not written by this timer
 
 			movf	operation_mode, w
 			btfsc	ZERO
@@ -89,6 +91,11 @@ touch_plus_short_2:	call	set_display_off_delay
 			btfss   ZERO
 			goto	touch_plus_setup
 
+			movf	var_timer_target_temp, w
+			btfsc	ZERO
+			goto	touch_disp_target_temp	; On first touch just display
+			
+			; Increase target temperature
 			incf	target_temperature, f
 			btfss	FLAG_FAHRENHEIT
 			incf	target_temperature, f
@@ -96,13 +103,26 @@ touch_plus_short_2:	call	set_display_off_delay
 			movf	target_temperature, w
 			call	chk_target_temp_range
 			btfsc	CARRY			
-			goto	touch_set_target_temp
+			goto	touch_disp_target_temp
 
 			movlw	CELSIUS_MAX
 			btfsc	FLAG_FAHRENHEIT
 			movlw	FAHRENHEIT_MAX
 			movwf	target_temperature
-			goto	touch_set_target_temp
+			goto	touch_disp_target_temp
+
+;--------------------------------------------------------- 
+; Plus long
+;--------------------------------------------------------- 
+touch_plus_long:	movf    setup_mode, w
+			btfsc   ZERO
+			goto	touch_enter_setup
+
+			movlw	TOUCH_REPEAT
+			movwf   var_timer_touch_repeat
+
+			movf    setup_mode, w
+			goto	touch_plus_setup
 
 ;--------------------------------------------------------- 
 ; Minus short
@@ -121,6 +141,11 @@ touch_minus_short_2:	call	set_display_off_delay
 			btfss   ZERO
 			goto	touch_minus_setup
     
+			movf	var_timer_target_temp, w
+			btfsc	ZERO
+			goto	touch_disp_target_temp	; On first touch just display
+
+			; Decrease target temperature
 			decf	target_temperature, f
 			btfss	FLAG_FAHRENHEIT
 			decf	target_temperature, f
@@ -128,21 +153,65 @@ touch_minus_short_2:	call	set_display_off_delay
 			movf	target_temperature, w
 			call	chk_target_temp_range
 			btfsc	CARRY			
-			goto	touch_set_target_temp
+			goto	touch_disp_target_temp
 
 			movlw	CELSIUS_MIN
 			btfsc	FLAG_FAHRENHEIT
 			movlw	FAHRENHEIT_MIN
 			movwf	target_temperature
-			goto	touch_set_target_temp
-			
+			goto	touch_disp_target_temp
 			
 ;--------------------------------------------------------- 
-; Plus / Minus long
-;
-; Enter setup if both touched
+; Minus long
 ;--------------------------------------------------------- 
-touch_plus_minus_long:	btfss	SIGNAL_TOUCH_PLUS_LONG
+touch_minus_long:	movf    setup_mode, w
+			btfsc   ZERO
+			goto	touch_enter_setup
+
+			movlw	TOUCH_REPEAT
+			movwf   var_timer_touch_repeat
+
+			movf    setup_mode, w
+			goto	touch_minus_setup
+
+			
+;--------------------------------------------------------- 
+; Repeat timer on hold
+;--------------------------------------------------------- 
+touch_repeat:		bcf	SIGNAL_TIMER_TOUCH_REPEAT
+			movlw	TOUCH_REPEAT
+			movwf   var_timer_touch_repeat	; Restart timer
+
+			movf    setup_mode, w
+			btfsc	SIGNAL_TOUCH_PLUS_LONG
+			goto	touch_plus_setup
+			btfsc	SIGNAL_TOUCH_MINUS_LONG
+			goto	touch_minus_setup
+			return
+			
+;--------------------------------------------------------- 
+; Stop repeat on release
+;--------------------------------------------------------- 
+touch_repeat_stop:	clrf	var_timer_touch_repeat
+			bcf	SIGNAL_TIMER_TOUCH_REPEAT
+			bcf	SIGNAL_RELEASE_MINUS
+			bcf	SIGNAL_RELEASE_PLUS
+			bcf	SIGNAL_RELEASE_POWER
+
+			movf    setup_mode, w
+			btfsc	ZERO
+			return	    ; If not in setup keep long press flags
+				    ;   to make it easier to enter setup
+			
+			bcf	SIGNAL_TOUCH_PLUS_LONG
+			bcf	SIGNAL_TOUCH_MINUS_LONG
+			bcf	SIGNAL_TOUCH_POWER_LONG
+			return
+
+;--------------------------------------------------------- 
+; Enter setup if + and - touched
+;--------------------------------------------------------- 
+touch_enter_setup:	btfss	SIGNAL_TOUCH_PLUS_LONG
 			return
 			btfss	SIGNAL_TOUCH_MINUS_LONG
 			return
@@ -157,15 +226,15 @@ touch_plus_minus_long:	btfss	SIGNAL_TOUCH_PLUS_LONG
 ;--------------------------------------------------------- 
 ; Set target temperature
 ;--------------------------------------------------------- 
-touch_set_target_temp:	movf	target_temperature, w
+touch_disp_target_temp:	movf	target_temperature, w
 			call	display_temperature
 
 			bsf	FLAG_TEMPERATURE_CHANGED
 			bsf	FLAG_RELAY_IMMEDIATE
 
-			bcf	SIGNAL_TIMER_INACTIVITY
-			movlw	INACTITIVY_TIMER
-			movwf	var_timer_inactivity
+			bcf	SIGNAL_TIMER_TARGET_TEMPERATURE
+			movlw	TARGET_TEMPERATURE_TIMER
+			movwf	var_timer_target_temp
 			return
 
 ;--------------------------------------------------------- 

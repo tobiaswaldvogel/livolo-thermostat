@@ -40,6 +40,18 @@ If the valves of a water heating are closed for too much time they might get stu
 ### Hardware modification (light sensor)
 For my bedroom, I wanted the display to turn off automatically in the darkness. Therefore, I considered also adding a light sensor. There is another DS18B20 thermometer inside, which is not really useful, so we can use this pin for it. Unfortunately pin 8 (RB6) cannot be configure as A/D converter input, so I connected the external thermometer to this pin and the photo resistor to pin 10 (RB4), which can be used for the ADC. My firmware detects the thermometer automatically. Therefore, you may or may not do this mod.
 
+# Release notes
+* 1.0 Initial release  
+  
+* 1.1 Functional enhancements  
+Permanent night mode possible without light sensor by setting a threshold above 50  
+First touch of '+' or '-' just shows the target temperature without changing it  
+Unit symbols flashes when target temperature is displayed  
+Holding '+' or '-' in setup moves quickly through the value  
+  
+  
+
+
 ## Getting started
 [Hardware description](doc/hardware.md)  
 [Hardware modifications](doc/hardware_mod.md)  

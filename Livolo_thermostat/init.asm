@@ -38,6 +38,9 @@ init_clear_bank0:	clrf	INDF
 			movwf	disp_l
 			movwf	disp_r
 
+			movlw	50			; Set light sensor initial
+			movwf	light_sensor_value	;  value to 50
+			
 			; Setup PINs
 			bsf	RP0		; bank 1
 
@@ -222,7 +225,7 @@ target_temp_offset:	movlw	EE_TEMPERATURE_OFFSET
 			subwf	VALVE_MAINTAIN_MAX	; More than VALVE_MAINTAIN_MAX
 			btfss	CARRY			; Skip if <=
 			clrf	valve_maintain_days	; Default off
-			call	valve_maint_calc    ; Update initialization value
+			call	valve_maint_calc	; Update initialization value
 			
 			; Restore operation mode
 			clrf	operation_mode		; Default heating
@@ -231,6 +234,15 @@ target_temp_offset:	movlw	EE_TEMPERATURE_OFFSET
 			subwf	OPERATION_MODE_COOLING
 			btfsc	ZERO
 			incf	operation_mode
+
+			; Restore light sensor limit
+			movlw	EE_LIGHT_SENSOR
+			call	read_eeprom
+			movwf	light_sensor_limit
+			sublw	LIGHT_SENSOR_MAX
+			movlw	10			; => Default 10
+			btfss	CARRY
+			movwf	light_sensor_limit	; Set default value
 			
 			; Wait until oscillator is stable
 		    	bsf	RP0
@@ -265,19 +277,12 @@ try_thermometer_rb6:	btfss	PORTB, 6
 			call	one_wire_reset
 			btfss	CARRY
 			goto	error_no_therm_rb6	; No PD detect on RB6
-
-			movlw	EE_LIGHT_SENSOR
-			call	read_eeprom
-			movwf	light_sensor_limit
-			sublw	LIGHT_SENSOR_MAX
-			movlw	10			; => Default 10
-			btfss	CARRY
-			movwf	light_sensor_limit	; Set default value
 			
 			; The thermometer is connected to RB6
 			; Configure RB4 as analog input AN10
 			; For light detection
 			; AN10 with Vdd and left justified
+			bsf	FLAG_HAS_LIGHT_SENSOR
 			movlw	(10 << ADCON0_CHS_POSN) | (1 << ADCON0_ADON_POSN)
 			movwf	ADCON0
 			
