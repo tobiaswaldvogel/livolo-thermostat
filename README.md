@@ -29,14 +29,17 @@ The final firmware now has these new features:
 * Manual display off with a long touch on the power sensor
 * Anti freeze  
 To protect your water pipes when you are on holiday, switching off the thermostat does not switch it off completely but sets the temperature to the minimum (5 degrees C / 41 degrees F). Switching it on again will restore the last temperature set.
+* Valve maintenance  
+If the valves of a water heating are closed for too much time they might get stuck. This firmware features a valve maintenance mode, where you can set the amount of days without opening the valves after which they will be open for 5 minutes. If the light sensor detects night mode then it is delayed until there is light again.
 * Setup mode for the following parameters  
+    * Operation mode (heating / cooling)
     * Temperature offset  
 Positive or negative offset for temperature calibration (steps are 0.5 degrees C or 1 degree F)
     * Delay for acting the valves
 Range 1..99 with a unit of 10s, s from 10s to 16m30
+    * Valve maintenance time in days
+    * Brightness for day and night mode
     * Light sensor threshold for turning off the display (night mode)
-* Valve maintenance  
-If the valves of a water heating are closed for too much time they might get stuck. This firmware features a valve maintenance mode, where you can set the amount of days without opening the valves after which they will be open for 5 minutes. If the light sensor detects night mode then it is delayed until there is light again.
 ### Hardware modification (light sensor)
 For my bedroom, I wanted the display to turn off automatically in the darkness. Therefore, I considered also adding a light sensor. There is another DS18B20 thermometer inside, which is not really useful, so we can use this pin for it. Unfortunately pin 8 (RB6) cannot be configure as A/D converter input, so I connected the external thermometer to this pin and the photo resistor to pin 10 (RB4), which can be used for the ADC. My firmware detects the thermometer automatically. Therefore, you may or may not do this mod.
 
@@ -44,15 +47,15 @@ For my bedroom, I wanted the display to turn off automatically in the darkness. 
 * 1.0 Initial release  
   
 * 1.1 Functional enhancements  
-Permanent night mode possible without light sensor by setting a threshold above 50  
-First touch of '+' or '-' just shows the target temperature without changing it  
-Unit symbols flashes when target temperature is displayed  
-Holding '+' or '-' in setup moves quickly through the value  
+    * Permanent night mode possible without light sensor by setting a threshold above 50  
+    * First touch of '+' or '-' just shows the target temperature without changing it  
+    * Unit symbols flashes when target temperature is displayed  
+    * Holding '+' or '-' in setup moves quickly through the value  
   
 * 1.2 Functional enhancements and major rework  
-Brightness for day and night mode can be adjusted  
-Switch CPU from 4mhz to 8mhz in order to be able to handle the the time slices for dimming.  
-Display frequency increased from 50hz to 62.5hz to reduce flicker effect.  
+    * Brightness for day and night mode can be adjusted  
+    * Switch CPU from 4mhz to 8mhz in order to be able to handle the the time slices for dimming.  
+    * Display frequency increased from 50hz to 62.5hz to reduce flicker effect.  
 
 ## Getting started
 [Hardware description](doc/hardware.md)  
