@@ -2,6 +2,7 @@
 #include "global.inc"
     
 global write_eeprom, read_eeprom
+global toggle_f_led    
 
 psect code
 
@@ -38,5 +39,15 @@ read_eeprom:		bcf	RP0
 			bcf	RP0	; bank 2
 			movf	EEDAT, w
 			bcf	RP1	; bank 0
+			return
+
+;--------------------------------------------------------- 
+; Toggle Fahrenheit indicator for debugging
+;--------------------------------------------------------- 
+toggle_f_led:		btfss	LED_FAHRENHEIT
+			goto	set_f_led
+			bcf	LED_FAHRENHEIT
+			return
+set_f_led:		bsf	LED_FAHRENHEIT    
 			return
 			

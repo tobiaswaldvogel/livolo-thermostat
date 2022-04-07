@@ -2,233 +2,274 @@
 #include "global.inc"   
 #include "one_wire.inc"
 		
+global  one_wire_set_port, one_wire_set_pin
 global	one_wire_reset, one_wire_rx, one_wire_tx
 
+psect	one_wire_local_var, global, class=BANK1, space=SPACE_DATA, delta=1, noexec
+var_one_wire_port:		ds  1
+var_one_wire_pin_mask:		ds  1
+var_one_wire_fsr_backup:	ds  1
+var_one_wire_bit_counter:	ds  1
+var_one_wire_wait_counter:	ds  1
+var_one_wire_data:		ds  1
+var_one_wire_last_tx:		ds  1
+var_one_wire_pullup_tx:		ds  1
+    
 psect   code
 
-bit_counter		equ	arg_0
-presence_detect		equ	arg_1
-tx_data			equ	arg_1		
-   
-; Waits time in us
-WAIT			macro	TIME    
-			;   Wait 500 us
-			movlw	(TIME / 5) -1	;1us 
-			movwf	arg_2	    	;1us
-			nop                     ;1us
-			nop                     ;1us => 4us before loop
-						;1 additional from decfsz if 0
-
-			nop                     ;1us
-			nop                     ;1us
-			decfsz	arg_2		;1us if not zero or 2us if zero
-			goto	$ - 3		;2us => 5 2us in loop
-			endm
-
-one_wire_reset:		btfss	FLAG_ONEWIRE_RB6
-			goto	one_wire_reset_rb4
-			goto	one_wire_reset_rb6
-
-one_wire_rx:		btfss	FLAG_ONEWIRE_RB6
-			goto	one_wire_rx_rb4
-			goto	one_wire_rx_rb6
-
-one_wire_tx:		btfss	FLAG_ONEWIRE_RB6
-			goto	one_wire_tx_rb4
-			goto	one_wire_tx_rb6
-
-;--------------------------------------------------------- 
-; OneWire routines for RB4
-;--------------------------------------------------------- 
-one_wire_reset_rb4:	clrf	presence_detect	; Presence detect
-			bcf	GIE
-			bsf	RP0			   
-			bsf	TRISB, 4	; DQ High
-			bcf	RP0
-			bcf	PORTB, 4	; Clear DQ
-			bsf	RP0
-			bcf	TRISB, 4 
-			bcf	RP0
-			WAIT	500		; keep DQ 500us low
-
-			bsf	RP0
-			bsf	TRISB, 4	; DQ high
-			bcf	RP0
-			
-			WAIT	70		    ; Release line and wait 70us for PD Pulse
-
-			btfss	PORTB, 4	    ; Read for a PD Pulse
-			incf	presence_detect, f  ; Indicate PD
-			
-			bsf	GIE
-			WAIT	430		    ; Wait 430us after PD Pulse
-			rrf	presence_detect, f  ; Rotate bit 0 (PD)to Carry
-			retlw	0
-
-; FSR points to byte to send, assume bank 0			
-one_wire_tx_rb4:	movwf	tx_data		; Send data
-			movlw	8		; Bit counter
-			movwf	bit_counter
-one_wire_tx_loop_rb4:	bcf	GIE
-			bcf	PORTB, 4	; DQ low
-			bsf	RP0		; Bank 1
-			bcf	TRISB, 4	; Swith DQ to output 
-			bcf	RP0
-			nop			; hold for 3us
-			nop
-			nop
-			rrf	tx_data, f	; Next bit of send data in Carry
-			bsf	RP0
-			btfsc	CARRY		; Keep low  if bit 0
-			bsf	TRISB, 4	; Set High if bit 1
-			WAIT	60
-			bsf	TRISB, 4	; High
-			bcf	RP0		; bank 0
-			decf	bit_counter, f	; Bit counter
-			btfss	ZERO		; if this is not the last bit we
-			bsf	GIE		;   can enable interrupts already
-						; 2 us recovery
-			btfss	ZERO
-			goto	one_wire_tx_loop_rb4
-
-			btfsc	FLAG_ONEWIRE_SELF_POWERED
-			goto	one_wire_tx_ret_rb4
-    			rrf	arg_1, w	; Restore send data
-			sublw	DS18B20_CONVERT
-			btfss	ZERO
-			goto	one_wire_tx_ret_rb4
-			; Set port to output high for parasite power after CONVERT cmd
-			bsf	PORTB, 4	; High
-			bsf	RP0			   
-			bcf	TRISB, 4	; Output
-			bcf	RP0
-
-one_wire_tx_ret_rb4:	bsf	GIE
-			retlw	0
-
-; FSR points to receive location			
-one_wire_rx_rb4:	movlw	8
-			movwf	bit_counter	; Bit counter
-one_wire_rx_loop_rb4:	bcf	GIE
-			bcf	PORTB, 4	; DQ low
-			bsf	RP0
-			bcf	TRISB, 4 
-			nop			; DQ low for 6us
-			nop
-			nop
-			nop
-			nop
-			nop
-			bsf	TRISB, 4	; High
-			bcf	RP0
-			nop			; DQ high for 4us
-			nop
-			nop
-			nop
-			movf	PORTB, w	; Read DQ
-			bsf	GIE
-			andlw	1 << 4		; Mask off the DQ bit
-			addlw	-1		; C = DQ
-			rrf	INDF, f
-			WAIT	50
-			decfsz	bit_counter, f	; Bit counter
-			goto	one_wire_rx_loop_rb4
-			retlw	0
+one_wire_port		equ	BANKMASK(var_one_wire_port)
+one_wire_pin_mask	equ	BANKMASK(var_one_wire_pin_mask)
+one_wire_fsr_backup	equ	BANKMASK(var_one_wire_fsr_backup)
+one_wire_bit_counter	equ	BANKMASK(var_one_wire_bit_counter)
+one_wire_wait_counter	equ	BANKMASK(var_one_wire_wait_counter)
+one_wire_data		equ	BANKMASK(var_one_wire_data)
+one_wire_pullup_tx	equ	BANKMASK(var_one_wire_pullup_tx)
    
 ;--------------------------------------------------------- 
-; OneWire routines for RB6
+; Set one wire port (PORT A, PORT B, PORT C)
 ;--------------------------------------------------------- 
-one_wire_reset_rb6:	clrf	presence_detect	; Presence detect
-			bcf	GIE
-			bsf	RP0			   
-			bsf	TRISB, 6	; DQ High
+one_wire_set_port:	bsf	RP0
+			bcf	RP1
+			movwf	one_wire_port
 			bcf	RP0
-			bcf	PORTB, 6	; Clear DQ
-			bsf	RP0
-			bcf	TRISB, 6 
+			bcf	RP1
+			return
+    
+;--------------------------------------------------------- 
+; Set one wire pin 0 .. 7
+;--------------------------------------------------------- 
+one_wire_set_pin:	bsf	RP0
+			bcf	RP1
+			clrf	one_wire_pin_mask
+			movwf	arg_0
+			incf	arg_0, f
+			bsf	CARRY
+one_wire_set_pin_shift:	rlf	one_wire_pin_mask, f
+			decfsz	arg_0
+			goto	one_wire_set_pin_shift
 			bcf	RP0
-			WAIT	500		; keep DQ 500us low
+			bcf	RP1
+			return
 
-			bsf	RP0
-			bsf	TRISB, 6	; DQ high
-			bcf	RP0
+#if _XTAL_FREQ  == 8000000
+;--------------------------------------------------------- 
+; Wait (W * 4us)    Min W = 2
+;--------------------------------------------------------- 
+one_wire_wait:		; - call   1.5us
+			; - init   2.0us
+			; - return 0.5us (0.5us saved in decfsz vs goto)
+			; Total = (W -1) * 2 * 2 + 4 = W * 4
+			movwf	one_wire_wait_counter	    ;0.5us
+			decf	one_wire_wait_counter, f    ;0.5us
+			bcf	CARRY			    ;0.5us
+			rlf	one_wire_wait_counter, f    ;0.5us
 			
-			WAIT	70              ; Release line and wait 70us for PD Pulse
+one_wire_wait_2us:	nop				    ;0.5us
+			decfsz	one_wire_wait_counter	    ;0.5us if not zero or 1us if zero
+			goto	one_wire_wait_2us	    ;1.0us = > 2us per loop
+			retlw	0			    ;1.0us
 
-			btfss	PORTB, 6	    ; Read for a PD Pulse
-			incf	presence_detect, f  ; Indicate PD
+#elif _XTAL_FREQ  == 4000000
+;--------------------------------------------------------- 
+; Wait (W * 4us)   Min W = 2
+; Fehler +1 us			
+;--------------------------------------------------------- 
+one_wire_wait:		; Case W = 2
+			; - call         3.0us
+			; - init + ret   6.0us
+			; Total 9us
 			
-			bsf	GIE
-			WAIT	430		    ; Wait 430us after PD Pulse
-			rrf	presence_detect, f  ; Rotate bit 0 (PD)to Carry
+			; Case W > 2
+			; - call         3.0us
+			; - init         5.0us
+			; - return       1.0us (1us saved in decfsz vs goto)
+			; Total = (W - 2) * 4 + 9 = W * 4 + 1
+			movwf	one_wire_wait_counter	    ;1.0us
+			decf	one_wire_wait_counter, f    ;1.0us
+			decf	one_wire_wait_counter, f    ;1.0us
+			btfsc ZERO			    ;1.0us if zero or 2us if not zero
+			retlw	0			    ;2.0us
+
+one_wire_wait_4us:	nop				    ;1.0us
+			decfsz	one_wire_wait_counter	    ;1.0us if not zero or 2us if zero
+			goto	one_wire_wait_4us	    ;2.0us = > 4us per loop
+			retlw	0			    ;2.0us
+
+#else
+			ERROR
+#endif			
+		
+			
+one_wire_reset:		bsf	RP0
+			bcf	RP1
+			movf	FSR, w		    ; Save FSR
+			movwf	one_wire_fsr_backup
+			movf	one_wire_port, w
+			movwf	FSR
+			
+			movf	one_wire_pin_mask, w
+			xorlw	0ffh
+			andwf	INDF, f		    ; DQ low
+			bsf	FSR, 7		    ; Switch to TRIS
+			andwf	INDF, f		    ; DQ output
+			bcf	FSR, 7
+			
+			movlw	480 / 4
+			call	one_wire_wait       ; Keep DQ for at least 480us low
+
+			bcf	GIE		    ; Disable interrupts
+
+			movf	one_wire_pin_mask, w
+			bsf	FSR, 7		    ; Switch to TRIS
+			iorwf	INDF, f		    ; DQ input
+			bcf	FSR, 7
+			
+			movlw	80 / 4
+			call	one_wire_wait       ; Release line and wait 70us for PD Pulse
+			
+			movf	one_wire_pin_mask, w
+			andwf	INDF, w
+			movwf	one_wire_data	    ; Store presence detect
+			
+			bsf	GIE		    ; Enable interrupts
+
+			movlw	400 / 4
+			call	one_wire_wait       ; Wait 430us after PD Pulse
+
+			bcf	CARRY
+			movf	one_wire_data, w
+			btfsc	ZERO
+			bsf	CARRY
+
+			movf	one_wire_fsr_backup, w
+			movwf	FSR		    ; Restore FSR
+			bcf	RP0
+			bcf	RP1
 			retlw	0
 
-; FSR points to byte to send, assume bank 0			
-one_wire_tx_rb6:	movwf	tx_data		; Send data
-			movlw	8		; Bit counter
-			movwf	bit_counter
-one_wire_tx_loop_rb6:	bcf	GIE
-			bcf	PORTB, 6	; DQ low
-			bsf	RP0		; Bank 1
-			bcf	TRISB, 6	; Swith DQ to output 
+;--------------------------------------------------------- 
+; Send byte in W
+; Carry => Set DQ to high outout after last bit
+;   (used for parasite powering DS18B20)			
+;--------------------------------------------------------- 
+one_wire_tx:		bsf	RP0		    ; Bank 1
+			bcf	RP1
+			movwf	one_wire_data	    ; Send data
+
+			clrf	one_wire_pullup_tx  ; Carry => Pullup after TX
+			btfsc	CARRY
+			incf	one_wire_pullup_tx
+			
+			movf	FSR, w		    ; Save FSR
+			movwf	one_wire_fsr_backup
+			movf	one_wire_port, w
+			movwf	FSR
+			
+			movlw	8		    ; Bit counter
+			movwf	one_wire_bit_counter
+
+one_wire_tx_loop:	bcf	GIE
+
+			movf	one_wire_pin_mask, w
+			xorlw	0ffh
+			andwf	INDF, f		    ; DQ low
+			bsf	FSR, 7		    ; Switch to TRIS
+			andwf	INDF, f		    ; DQ output
+    			
+			rrf	one_wire_data, w    ; Next bit of send data in Carry
+			btfss	CARRY
+			movlw	64 / 4		    ; For 0 keep DQ 64 us low
+			btfsc	CARRY
+			movlw	12 / 4		    ; For 1 keep DQ 12 us low
+    			call	one_wire_wait
+    
+			movf	one_wire_pin_mask, w
+			iorwf	INDF, f		    ; DQ input
+			bcf	FSR, 7
+
+			decf	one_wire_bit_counter, w
+			btfss	ZERO		    ; Last bit sent?
+			goto	one_wire_no_pullup  ; No
+			
+			movf	one_wire_pullup_tx, w ; Pull up after TX?
+			btfsc	ZERO
+			goto	one_wire_no_pullup  ; No, nothing to do
+			
+			; Switch DQ to high output
+			movf	one_wire_pin_mask, w
+			iorwf	INDF, f		    ; DQ high
+			bsf	FSR, 7		    ; Switch to TRIS
+			xorlw	0ffh
+			andwf	INDF, f		    ; DQ output
+			bcf	FSR, 7
+			
+one_wire_no_pullup:	bsf	GIE		    ; Interrupts can be enabled already
+
+			rrf	one_wire_data, f    ; Next bit of send data in Carry and advance
+			btfss	CARRY
+			movlw	12 / 4		    ; For 0 release DQ for 12us
+			btfsc	CARRY
+			movlw	64 / 4		    ; For 1 release DQ for 64us
+    			call	one_wire_wait
+			
+			decfsz	one_wire_bit_counter, f	; Bit counter
+			goto	one_wire_tx_loop
+
+one_wire_tx_ret:	movf	one_wire_fsr_backup, w
+			movwf	FSR		    ; Restore FSR
 			bcf	RP0
-			nop			; hold for 3us
-			nop
-			nop
-			rrf	tx_data, f	; Next bit of send data in Carry
-			bsf	RP0
-			btfsc	CARRY		; Keep low  if bit 0
-			bsf	TRISB, 6	; Set High if bit 1
-			WAIT	60
-			bsf	TRISB, 6	; High
-			bcf	RP0		; bank 0
-			decf	bit_counter, f	; Bit counter
-			btfss	ZERO		; if this is not the last bit we
-			bsf	GIE		;   can enable interrupts already
-						; 2 us recovery
+			bcf	RP1
+			retlw	0
+			
+;--------------------------------------------------------- 
+; Receive byte and return in W
+;--------------------------------------------------------- 
+one_wire_rx:		bsf	RP0
+			bcf	RP1
+			movf	FSR, w		    ; Save FSR
+			movwf	one_wire_fsr_backup
+			movf	one_wire_port, w
+			movwf	FSR
+
+			movlw	8
+			movwf	one_wire_bit_counter	; Bit counter
+
+one_wire_rx_loop:	bcf	GIE		    ; Disable interrupts
+
+			movf	one_wire_pin_mask, w
+			xorlw	0ffh
+			andwf	INDF, f		    ; DQ low
+			bsf	FSR, 7		    ; Switch to TRIS
+			andwf	INDF, f		    ; DQ output
+ 
+			movlw	12 / 4		    ; For 1 keep DQ 12 us low
+    			call	one_wire_wait
+
+			movf	one_wire_pin_mask, w
+			iorwf	INDF, f		    ; DQ input
+			bcf	FSR, 7
+
+			movlw	8 / 4		    ; Wait 12us
+    			call	one_wire_wait
+			
+			movf	one_wire_pin_mask, w
+			bcf	CARRY
+			andwf	INDF, w
+			bsf	GIE		    ; Re-enable interrupts
 			btfss	ZERO
-			goto	one_wire_tx_loop_rb6
+			bsf	CARRY		    ; Set carry if DQ high
+			rrf	one_wire_data, f
 
-			btfsc	FLAG_ONEWIRE_SELF_POWERED
-			goto	one_wire_tx_ret_rb6
-    			rrf	arg_1, w	; Restore send data
-			sublw	DS18B20_CONVERT
-			btfss	ZERO
-			goto	one_wire_tx_ret_rb6
-			; Set port to output high for parasite power after CONVERT cmd
-			bsf	PORTB, 6	; High
-			bsf	RP0			   
-			bcf	TRISB, 6	; Output
+			movlw	52 / 4
+			call	one_wire_wait
+			
+			decfsz	one_wire_bit_counter, f	; Bit counter
+			goto	one_wire_rx_loop
+			
+			movf	one_wire_fsr_backup, w
+			movwf	FSR		    ; Restore FSR
+			movf	one_wire_data, w
 			bcf	RP0
-
-one_wire_tx_ret_rb6:	bsf	GIE
-			retlw	0
-
-; FSR points to receive location			
-one_wire_rx_rb6:	movlw	8
-			movwf	bit_counter	; Bit counter
-one_wire_rx_loop_rb6:	bcf	GIE
-			bcf	PORTB, 6	; DQ low
-			bsf	RP0
-			bcf	TRISB, 6 
-			nop			; DQ low for 6us
-			nop
-			nop
-			nop
-			nop
-			nop
-			bsf	TRISB, 6	; High
-			bcf	RP0
-			nop			; DQ high for 4us
-			nop
-			nop
-			nop
-			movf	PORTB, w	; Read DQ
-			bsf	GIE
-			andlw	1 << 6		; Mask off the DQ bit
-			addlw	-1		; C = DQ
-			rrf	INDF, f
-			WAIT	50
-			decfsz	bit_counter, f	; Bit counter
-			goto	one_wire_rx_loop_rb6
-			retlw	0
+			bcf	RP1
+			return
+  

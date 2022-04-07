@@ -2,22 +2,26 @@
 #include "global.inc"
 
 psect	global_var, global, class=BANK0, space=SPACE_DATA, delta=1, noexec
-disp_l:			    ds  1   ; Left digit
-disp_r:			    ds  1   ; Right digit
+display_bcd:		    ds	1   ; BCD value for display
+disp_leds:		    ds	1   ; LED state
+disp_brightness:	    ds	1
 flags1:			    ds	1    
 flags2:			    ds	1    
 setup_mode:		    ds	1
 
-timer50hz:		    ds	1    
+brightness:		    ds	1   ; Brightness for normal operation 1..250
+brightness_night:	    ds	1    
+    
+var_timer_125hz:	    ds	1    
 var_timer_thermometer:	    ds	1   ; Timer for thermometer sampling
 var_timer_adc:		    ds	1   ; Timer for ADC (light sensor)
 var_timer_target_temp:	    ds	1   ; Timer for displaying current temperature again after '+'/'-'
-var_timer_relay:	    ds	3
-var_timer_valve_maint:	    ds	4   ; Timer for valve maintenance    
-var_timer_valve_maint_set:  ds	4   ; Value for intializing maintenance timer
-timer_valve_maint_mult:	    ds	4   ; Temporary variable for calculating var_timer_valve_maint_set
+var_timer_relay:	    ds	2   ; Timer to wait for temperature to settle (seconds)
+var_timer_valve_maint:	    ds	3   ; Timer for valve maintenance    
+var_timer_valve_maint_set:  ds	3   ; Value for intializing maintenance timer
+timer_valve_maint_mult:	    ds	3   ; Temporary variable for calculating var_timer_valve_maint_set
     
-var_timer_keep_displ_on:    ds	2   ; Timer for keeping the display on after touching a sensor    
+var_timer_night_disable:    ds	1   ; Timer for disableing night mode after touching a sensor (1s unit)
 var_timer_touch_repeat:	    ds	1   ; Timer for long press repeat
     
 signal_touch:		    ds	1   ; Signals for touch events
@@ -62,3 +66,5 @@ EE_FAHRENHEIT:		    ds  1
 EE_LIGHT_SENSOR:	    ds	1
 EE_VALVE_MAINTAIN:	    ds	1
 EE_OPERATION_MODE:	    ds	1
+EE_BRIGHTNESS:		    ds	1    
+EE_BRIGHTNESS_NIGHT:	    ds	1        

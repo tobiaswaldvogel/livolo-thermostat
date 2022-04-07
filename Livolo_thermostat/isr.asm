@@ -10,9 +10,9 @@ cap_new_avg:	    ds	    3
 
 sensor_state_mask:  ds	    1
 sensor_hold_time:   ds	    3
-    
+
 ;Interrupt vector		    
-psect	isr_vector,abs,class=CODE,space=SPACE_CODE,delta=2		
+psect	isr_vector, abs,class=CODE, space=SPACE_CODE, delta=2		
 		    org	4
 
 ;--------------------------------------------------------- 
@@ -256,57 +256,247 @@ cap_sensor_measure: clrf    TMR1H	    ; Start next measure
     
 ;--------------------------------------------------------- 
 ; Timer 2 interrupt
-; Running every 10ms (100Hz)		    
+; Running every 8ms (125Hz)
 ;--------------------------------------------------------- 
 isr_timer2:	    bcf	    TMR2IF	    ; Acknoledge interrupt
-		    movf    FSR, w
-		    movwf   isr_fsr	    ; Save FSR register
 
-		    btfss   FLAG_DISPLAY_ENABLE
+		    bcf	    PIN_DISP_LEFT
+		    bcf	    PIN_DISP_RIGHT
+;		    
+		    btfss   FLAG_TMR2_DIM
+		    goto    isr_timer2_display
+
+		    ; Interrupt for dimming the display
+		    ; The remaining time slice to 10ms is
+		    ; 250 - brightness timer 2 units
+		    movf    disp_brightness, w
+		    sublw   TIMER2_PERIOD
+		    bsf	    RP0			; Bank 1
+		    movwf   PR2
+		    bcf	    RP0			; Bank 0
+
+		    bcf	    FLAG_TMR2_DIM
+		    bcf	    PIN_LED_CELSIUS
+		    bcf	    PIN_LED_FAHRENHEIT
+
+		    movf    setup_mode, w
+		    btfss   ZERO
+		    goto    isr_ret		; In setup mode don't modify the LEDs
+		    
+		    ; Switch off + / -
+		    bsf	    RP0
+		    bcf	    PIN_LED_POWER	; TRIS -> output
+		    bcf	    RP0
+		    bcf	    PIN_LED_POWER
+		    
+		    goto    isr_ret		; No then do it in the next interrupt
+
+isr_timer2_display: movf    disp_brightness, w
+		    btfsc   ZERO
+		    goto    display_nodim	; Brightness 0 => no dimming
+		    bsf	    RP0			; Bank 1
+		    movwf   PR2
+		    bcf	    RP0			; Bank 0
+		    sublw   TIMER2_PERIOD - 1	; C   < TIMER2_PERIOD
+		    btfss   CARRY
+		    goto    display_nodim
+		    
+		    ; Dim display
+		    bsf	    FLAG_TMR2_DIM
+		    goto    display_multiplex
+
+		    ; If no dimming set next interrupt to the full 10ms time slice
+display_nodim:	    movlw   TIMER2_PERIOD
+		    bsf	    RP0			; Bank 1
+		    movwf   PR2
+		    bcf	    RP0			; Bank 0
+
+display_multiplex:  movf    disp_brightness, w
+		    btfss   ZERO
+		    goto    display_power
+		    
+		    ; Display off
+		    bcf	    PIN_LED_CELSIUS
+		    bcf	    PIN_LED_FAHRENHEIT
+
+		    movf    setup_mode, w	
+		    btfss   ZERO
+		    goto    display_end		; In setup mode don't modify the LEDs
+		    
+		    bsf	    RP0
+		    bcf	    PIN_LED_POWER	; TRIS -> output
+		    bcf	    RP0
+		    bcf	    PIN_LED_POWER
 		    goto    display_end
+		    
+		    ; Power / + / -
+display_power:	    btfsc   LED_POWER_ON
+		    goto    display_power_on
+		    ; Off
+		    bsf	    RP0
+		    bcf	    PIN_LED_POWER	; TRIS -> output
+		    bcf	    RP0
+		    bcf	    PIN_LED_POWER
+		    goto    display_power_end
+display_power_on:   btfsc   LED_POWER_RED
+		    goto    display_power_red
+		    ; + / - lit + blue
+		    bsf	    RP0
+		    bsf	    PIN_LED_POWER	; TRIS -> input
+		    bcf	    RP0			; => lit + blue led			
+		    goto    display_power_end
+display_power_red:  bsf	    RP0
+		    bcf	    PIN_LED_POWER	; TRIS -> output
+		    bcf	    RP0
+		    bsf	    PIN_LED_POWER
+display_power_end:		    
 
+		    ; Unit Celcius
+		    btfsc   LED_CELSIUS
+		    bsf	    PIN_LED_CELSIUS
+		    btfss   LED_CELSIUS
+		    bcf	    PIN_LED_CELSIUS
+
+		    ; Unit Fahrenheit
+		    btfsc   LED_FAHRENHEIT
+		    bsf	    PIN_LED_FAHRENHEIT
+		    btfss   LED_FAHRENHEIT
+		    bcf	    PIN_LED_FAHRENHEIT
+		    
 		    ; Display multiplex
-		    bcf	    DISP_LEFT
-		    bcf	    DISP_RIGHT
-		    bcf	    DISP_A
-		    bcf	    DISP_B
-		    bcf	    DISP_C
-		    bcf	    DISP_D
+		    bcf	    PIN_DISP_A
+		    bcf	    PIN_DISP_B
+		    bcf	    PIN_DISP_C
+		    bcf	    PIN_DISP_D
 
-		    movlw   disp_l
 		    btfsc   FLAG_TMR2_INT_EVEN
-		    movlw   disp_r
-		    movwf   FSR
-		    
-		    btfsc   INDF, 0
-		    bsf	    DISP_A
-		    btfsc   INDF, 1
-		    bsf	    DISP_B
-		    btfsc   INDF, 2
-		    bsf	    DISP_C
-		    btfsc   INDF, 3
-		    bsf	    DISP_D
+		    goto    display_right
 
-		    btfss   FLAG_TMR2_INT_EVEN
-		    bsf	    DISP_LEFT
-		    btfsc   FLAG_TMR2_INT_EVEN
-		    bsf	    DISP_RIGHT
-display_end:
+		    btfsc   display_bcd, 4
+		    bsf	    PIN_DISP_A
+		    btfsc   display_bcd, 5
+		    bsf	    PIN_DISP_B
+		    btfsc   display_bcd, 6
+		    bsf	    PIN_DISP_C
+		    btfsc   display_bcd, 7
+		    bsf	    PIN_DISP_D
+		    bsf	    PIN_DISP_LEFT
+		    goto    display_end
 		    
-		    btfss   FLAG_TMR2_INT_EVEN
+display_right:	    btfsc   display_bcd, 0
+		    bsf	    PIN_DISP_A
+		    btfsc   display_bcd, 1
+		    bsf	    PIN_DISP_B
+		    btfsc   display_bcd, 2
+		    bsf	    PIN_DISP_C
+		    btfsc   display_bcd, 3
+		    bsf	    PIN_DISP_D
+		    bsf	    PIN_DISP_RIGHT
+display_end:		    
+
+		    incf    var_timer_125hz, f
+		    movlw   -125
+		    addwf   var_timer_125hz, w
+		    btfss   CARRY
+		    goto    isr_timer2_8ms
+
+		    clrf    var_timer_125hz
+		    bsf	    SIGNAL_TIMER_1HZ
+
+isr_timer2_8ms:	    btfss   FLAG_TMR2_INT_EVEN
 		    goto    isr_timer2_sensors
 			
 ;--------------------------------------------------------- 
-; Handle timers in even 100Hz interrupts => 50Hz / 20ms
+; Handle timers in even 125Hz interrupts => 16ms
 ;--------------------------------------------------------- 
 		    bcf	    FLAG_TMR2_INT_EVEN
 
-		    incf    timer50hz, f
-		    movlw   -50
-		    addwf   timer50hz, w
-		    btfsc   CARRY
-		    clrf    timer50hz
+		    btfss   SIGNAL_TIMER_1HZ
+		    goto    timer_16ms
 
+		    bcf   SIGNAL_TIMER_1HZ
+		    
+;--------------------------------------------------------- 
+; Handle 1s unit timers
+;--------------------------------------------------------- 
+		    ; 8 bit Timer for temperature measurement
+		    movf    var_timer_thermometer, w
+		    btfsc   ZERO
+		    goto    timer_inactive_thermometer	; Timer is off
+		    decf    var_timer_thermometer, f
+		    btfsc   ZERO
+		    bsf	    SIGNAL_TIMER_THERMOMETER
+timer_inactive_thermometer:
+
+		    ; 8 bit timer for displaying the target temperature
+		    movf    var_timer_target_temp, w
+		    btfsc   ZERO
+		    goto    timer_inactive_target_temp	; Timer is off
+		    decf    var_timer_target_temp, f
+		    btfsc   ZERO
+		    bsf	    SIGNAL_TIMER_TARGET_TEMPERATURE
+timer_inactive_target_temp:
+
+		    ; 8 bit timer for keeping display on after a touch event
+		    movf    var_timer_night_disable, w
+		    btfsc   ZERO
+		    goto    timer_inactive_night_disable    ; Timer is inactive
+		    decf    var_timer_night_disable, f
+		    btfsc   ZERO
+		    bsf	    SIGNAL_TIMER_NIGHT_DISABLE
+timer_inactive_night_disable:
+
+		    ; 16 bit Valve delay timer
+		    movf    var_timer_relay, w
+		    iorwf   var_timer_relay + 1, w
+		    btfsc   ZERO
+		    goto    timer_inactive_relay_delay	; Timer is off (most likely case)
+		    ; LSB
+		    decfsz  var_timer_relay, f
+		    goto    timer_relay_delay
+		    ; Zero => Check if timer finished
+		    movf    var_timer_relay + 1, w
+		    btfss   ZERO
+		    goto    timer_inactive_relay_delay
+		    ; Timer finished
+		    bsf	    SIGNAL_TIMER_VALVE
+		    goto    timer_inactive_relay_delay
+		    ; Handle underflow
+timer_relay_delay:  incf    var_timer_relay, w		; Underflow LSB ?
+		    btfsc   ZERO			; Skip if not
+		    decf    var_timer_relay + 1, f	; Underflow cannot occur
+timer_inactive_relay_delay:
+    
+		    ; 24 bit timer for valve maintenance
+		    movf    var_timer_valve_maint, w
+		    iorwf   var_timer_valve_maint + 1, w
+		    iorwf   var_timer_valve_maint + 2, w
+		    btfsc   ZERO
+		    goto    timer_inactive_maintenance	; Timer is off
+		    ; LSB
+		    decfsz  var_timer_valve_maint, f
+		    goto    timer_maintenance
+		    ; Zero => Check if timer finished
+		    movf    var_timer_valve_maint + 1, w
+		    iorwf   var_timer_valve_maint + 2, w
+		    btfss   ZERO
+		    goto    timer_inactive_maintenance	; No underflow => done
+		    ; Timer finished
+		    bsf	    SIGNAL_TIMER_VALVE_MAINTAIN
+		    goto    timer_inactive_maintenance
+		    ; Handle underflow
+timer_maintenance:  incfsz  var_timer_valve_maint, w	; Underflow LSB ?
+		    goto    timer_inactive_maintenance	; No => done
+		    decf    var_timer_valve_maint + 1, f
+		    incf    var_timer_valve_maint + 1, w; Underflow byte 2 ?
+		    btfsc   ZERO			; Skip if not
+		    decf    var_timer_valve_maint + 2, f
+timer_inactive_maintenance:
+    
+;--------------------------------------------------------- 
+; Handle 16ms unit timers
+;--------------------------------------------------------- 
+timer_16ms:		    
 		    ; 8 bit Timer for touch repeat events
 		    movf    var_timer_touch_repeat, w
 		    btfsc   ZERO
@@ -316,15 +506,6 @@ display_end:
 		    bsf	    SIGNAL_TIMER_TOUCH_REPEAT
 timer_touch_repeat_off:
 		    
-		    ; 8 bit Timer for temperature measurement
-		    movf    var_timer_thermometer, w
-		    btfsc   ZERO
-		    goto    timer_therm_off		; Timer is off
-		    decf    var_timer_thermometer, f
-		    btfsc   ZERO
-		    bsf	    SIGNAL_TIMER_THERMOMETER
-timer_therm_off:
-		    
 		    ; 8 bit ADC timer for light sensor
 		    movf    var_timer_adc, w
 		    btfsc   ZERO
@@ -333,103 +514,17 @@ timer_therm_off:
 		    btfsc   ZERO
 		    bsf	    SIGNAL_TIMER_ADC
 timer_adc_off:
-		    
-		    ; 8 bit Display target temperature timer
-		    movf    var_timer_target_temp, w
-		    btfsc   ZERO
-		    goto    timer_target_temp_off	; Timer is off
-		    decf    var_timer_target_temp, f
-		    btfsc   ZERO
-		    bsf	    SIGNAL_TIMER_TARGET_TEMPERATURE
-timer_target_temp_off:
-
-		    ; 16 bit Keep display on timer
-		    movf    var_timer_keep_displ_on, w
-		    iorwf   var_timer_keep_displ_on + 1, w
-		    btfsc   ZERO
-		    goto    timer_keep_d_on_end		; Timer is off (most likely case)
-		    ; LSB
-		    decfsz  var_timer_keep_displ_on, f
-		    goto    isr_tmr_keep_d_on
-		    ; Zero => Check if timer finished
-		    movf    var_timer_keep_displ_on + 1, w
-		    btfss   ZERO
-		    goto    timer_keep_d_on_end
-		    ; Timer finished
-		    bsf	    SIGNAL_TIMER_KEEP_DISPLAY_ON
-		    goto    timer_keep_d_on_end
-		    ; Handle underflow
-isr_tmr_keep_d_on:  incf    var_timer_keep_displ_on, w	; Underflow LSB ?
-		    btfsc   ZERO			; Skip if not
-		    decf    var_timer_keep_displ_on + 1, f  ; Underflow cannot occur
-timer_keep_d_on_end:
-
-		    ; 24 bit Valve delay timer
-		    movf    var_timer_relay, w
-		    iorwf   var_timer_relay + 1, w
-		    iorwf   var_timer_relay + 2, w
-		    btfsc   ZERO
-		    goto    timer_relay_delay_end        ; Timer is off (most likely case)
-		    ; LSB
-		    decfsz  var_timer_relay, f
-		    goto    timer_relay_delay
-		    ; Zero => Check if timer finished
-		    movf    var_timer_relay + 1, w
-		    iorwf   var_timer_relay + 2, w
-		    btfss   ZERO
-		    goto    timer_relay_delay_end
-		    ; Timer finished
-		    bsf	    SIGNAL_TIMER_VALVE
-		    goto    timer_relay_delay_end
-		    ; Handle underflow
-timer_relay_delay:  incfsz  var_timer_relay, w		; Underflow LSB ?
-		    goto    timer_relay_delay_end	; No => done
-		    decf    var_timer_relay + 1, f
-		    incf    var_timer_relay + 1, w	; Underflow byte 1 ?
-		    btfsc   ZERO			; Skip if not
-		    decf    var_timer_relay + 2, f	; Underflow cannot occur
-timer_relay_delay_end:
-		    
-		    ; 32 bit timer for valve maintenance
-		    movf    var_timer_valve_maint, w
-		    iorwf   var_timer_valve_maint + 1, w
-		    iorwf   var_timer_valve_maint + 2, w
-		    iorwf   var_timer_valve_maint + 3, w
-		    btfsc   ZERO
-		    goto    timer_maintenance_end	; Timer is off
-		    ; LSB
-		    decfsz  var_timer_valve_maint, f
-		    goto    timer_maintenance
-		    ; Zero => Check if timer finished
-		    movf    var_timer_valve_maint + 1, w
-		    iorwf   var_timer_valve_maint + 2, w
-		    iorwf   var_timer_valve_maint + 3, w
-		    btfss   ZERO
-		    goto    timer_maintenance_end	; No underflow => done
-		    ; Timer finished
-		    bsf	    SIGNAL_TIMER_VALVE_MAINTAIN
-		    goto    timer_maintenance_end
-		    ; Handle underflow
-timer_maintenance:  incfsz  var_timer_valve_maint, w	; Underflow LSB ?
-		    goto    timer_maintenance_end	; No => done
-		    decf    var_timer_valve_maint + 1, f
-		    incfsz  var_timer_valve_maint + 1, w; Underflow byte 1 ?
-		    goto    timer_maintenance_end	; No => done
-		    decf    var_timer_valve_maint + 2, f
-		    incf    var_timer_valve_maint + 2, w; Underflow byte 2 ?
-		    btfsc   ZERO			; Skip if not
-		    decf    var_timer_valve_maint + 3, f
-timer_maintenance_end:
     
-		    movf    isr_fsr, w	    ; Restore FSR
-		    movwf   FSR
 		    goto    isr_ret
 		    
 ;--------------------------------------------------------- 
-; Handle sensor state in odd 100Hz interrupts => 50Hz / 20ms
+; Handle sensor state in odd 125Hz interrupts => 16ms
 ; The state is set from the timer 0 isr cap measuring
 ;--------------------------------------------------------- 
 isr_timer2_sensors: bsf	    FLAG_TMR2_INT_EVEN
+		    movf    FSR, w
+		    movwf   isr_fsr		; Save FSR register
+
 		    movlw   1
 		    movwf   sensor_state_mask
 		    movlw   sensor_hold_time

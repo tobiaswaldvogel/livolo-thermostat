@@ -4,7 +4,8 @@
 psect   code
 
 ; Publish    
-global	display_temperature, display_decimal, display_on, display_off
+global	display_temperature, display_decimal, display_unit
+global  display_day, display_night, disp_set_brightness   
 
 ;--------------------------------------------------------- 
 ; Display temperature in w
@@ -29,69 +30,62 @@ display_decimal:	clrf	arg_0
 			
 			addlw	-80	; >= 80 -> Carry
 			btfsc	CARRY
-			bsf	arg_0, 3
+			bsf	arg_0, 7
 			btfss	CARRY
 			addlw	80
 			
 			addlw	-40	; >= 40 -> Carry
 			btfsc	CARRY
-			bsf	arg_0, 2
+			bsf	arg_0, 6
 			btfss	CARRY
 			addlw	40
 			
 			addlw	-20	; >= 20 -> Carry
 			btfsc	CARRY
-			bsf	arg_0, 1
+			bsf	arg_0, 5
 			btfss	CARRY
 			addlw	20
 			
 			addlw	-10	; >= 10 -> Carry
 			btfsc	CARRY
-			bsf	arg_0, 0
+			bsf	arg_0, 4
 			btfss	CARRY
 			addlw	10
 			
-			movwf	disp_r
-			movf	arg_0, w
-			movwf	disp_l
-			return
-			
-;--------------------------------------------------------- 
-; Display on
-;--------------------------------------------------------- 
-display_on:		bsf	FLAG_DISPLAY_ENABLE
-			btfsc	FLAG_FAHRENHEIT
-			bcf	LED_CELSIUS
-			btfss	FLAG_FAHRENHEIT
-			bsf	LED_CELSIUS
-			btfsc	FLAG_FAHRENHEIT
-			bsf	LED_FAHRENHEIT
-			btfss	FLAG_FAHRENHEIT
-			bcf	LED_FAHRENHEIT
-    
-			btfsc	RELAY		; Relay active ?
-			goto	display_on_relay
-			bsf	RP0
-			bsf	LED_POWER	; TRIS -> input
-			bcf	RP0		; => lit + blue led
-			return
-			
-display_on_relay:	bsf	RP0
-			bcf	LED_POWER	; TRIS -> output
-			bcf	RP0
-			bsf	LED_POWER	; => lit + red led
+			iorwf	arg_0, w
+			movwf	display_bcd
 			return
 
 ;--------------------------------------------------------- 
-; Display off
+; Set bightness to day
 ;--------------------------------------------------------- 
-display_off:		bcf	FLAG_DISPLAY_ENABLE
-			bcf	DISP_LEFT
-			bcf	DISP_RIGHT
-			bcf	LED_CELSIUS
-			bcf	LED_FAHRENHEIT
-			bsf	RP0
-			bcf	LED_POWER	; TRIS -> output
-			bcf	RP0
-			bcf	LED_POWER	; => only blue led
+display_day:		movf	brightness, w
+			goto	disp_set_brightness
+
+;--------------------------------------------------------- 
+; Set brightness to night
+;--------------------------------------------------------- 
+display_night:		movf	brightness_night, w			
+
+			; Set brightness to W * 4
+disp_set_brightness:	movwf	arg_0
+			bcf	CARRY
+			rlf	arg_0	    ; * 2
+			rlf	arg_0	    ; * 4
+			movf	arg_0, w
+			movwf	disp_brightness
 			return
+
+;--------------------------------------------------------- 
+; Set unit LEDs
+;--------------------------------------------------------- 
+display_unit:		btfsc	FLAG_FAHRENHEIT
+			goto	display_unit_f
+			bsf	LED_CELSIUS
+			bcf	LED_FAHRENHEIT
+			return
+
+display_unit_f:		bcf	LED_CELSIUS
+			bsf	LED_FAHRENHEIT
+			return
+		

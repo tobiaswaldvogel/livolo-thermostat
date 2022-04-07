@@ -49,8 +49,10 @@ First touch of '+' or '-' just shows the target temperature without changing it
 Unit symbols flashes when target temperature is displayed  
 Holding '+' or '-' in setup moves quickly through the value  
   
-  
-
+* 1.2 Functional enhancements and major rework  
+Brightness for day and night mode can be adjusted  
+Switch CPU from 4mhz to 8mhz in order to be able to handle the the time slices for dimming.  
+Display frequency increased from 50hz to 62.5hz to reduce flicker effect.  
 
 ## Getting started
 [Hardware description](doc/hardware.md)  

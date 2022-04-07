@@ -8,15 +8,13 @@ global	main, convert_fahrenheit, set_relay_on, failure, day_night_mode
 global	touch_power_short, touch_power_long
 global	touch_plus_short,  touch_plus_long
 global  touch_minus_short, touch_minus_long
-global	touch_enter_setup
 global  touch_repeat, touch_repeat_stop   
 global	timer_target_temp, timer_adc
 global	timer_relay_stop, timer_relay_start
 global  timer_valve_maint_strt, timer_valve_maint_stop
-global  timer_valve_maint, timer_keep_displ_on
-global	display_setup, display_temperature, display_decimal
-global  display_on, display_off  
-global	enter_setup    
+global  timer_valve_maint, timer_night_disable
+global	setup_display, display_temperature, display_decimal
+global  display_day, display_night, disp_set_brightness, display_unit   
 global	one_wire_reset, one_wire_rx, one_wire_tx
 
 psect   code
@@ -27,8 +25,11 @@ psect   code
 failure_thermometer:	movlw	ERROR_THERMOMETER_NOT_PRESENT
     
 failure:		call	display_decimal
-failure_1:		movf	timer50hz, w
-			addlw	-25
+			movlw	BRIGHTNESS_MAX
+			call	disp_set_brightness
+
+failure_1:		movf	var_timer_125hz, w
+			addlw	-62
 			btfss	CARRY
 			bcf	LED_CELSIUS
 			btfss	CARRY
@@ -46,40 +47,56 @@ main:			clrf	STATUS
 			movlw	0xff
 			movwf	current_temperature
 
+			bcf	FLAG_NIGHT_MODE
+			bsf	FLAG_NIGHT_MODE_AUTOMATIC
+			call	display_unit
+			call	display_day
 			call	set_relay_off
-			call	display_on
+			bsf	FLAG_RELAY_IMMEDIATE
 
 main_detect_power_mode:	bsf	FLAG_ONEWIRE_SELF_POWERED
 			; Determine thermometer power mode
+
 			call	one_wire_reset
 			btfss	CARRY
 			goto	failure_thermometer
+
 			movlw	ONE_WIRE_SKIP_ROM
+			bcf	CARRY
 			call	one_wire_tx
 			movlw	DS18B20_POWER_SUPPLY
+			bcf	CARRY
 			call	one_wire_tx
-			movlw	arg_7		; LSB
-			movwf	FSR
+
 			call	one_wire_rx
-			btfss	INDF, 0
+			andlw	0b00000001
+			btfsc	ZERO
 			bcf	FLAG_ONEWIRE_SELF_POWERED   ; Parasite power
 
 			; Set thermometer to 11 bit resolution
 			call	one_wire_reset
 			btfss	CARRY
 			goto	failure_thermometer
+
 			movlw	ONE_WIRE_SKIP_ROM
+			bcf	CARRY
 			call	one_wire_tx
 			movlw	DS18B20_WRITE
+			bcf	CARRY
 			call	one_wire_tx
 			movlw	0
+			bcf	CARRY
 			call	one_wire_tx
 			movlw	0
+			bcf	CARRY
 			call	one_wire_tx
 			movlw	DS18B20_RES_11
+			bcf	CARRY
 			call	one_wire_tx
 		
 			call	measure_temperature
+			movlw	1   ; Set the timer to 1s for the initial read
+			movwf	var_timer_thermometer
 			
 			; Activate a watchdog with prescaler 2^16 
 			; as the clock source is 31khz this is ~ 2s
@@ -127,19 +144,19 @@ main_timer_signals:	btfsc	SIGNAL_TIMER_TARGET_TEMPERATURE
 			call	set_relay
 			btfsc	SIGNAL_TIMER_VALVE_MAINTAIN
 			call	timer_valve_maint
-			btfsc	SIGNAL_TIMER_KEEP_DISPLAY_ON
-			call	timer_keep_displ_on
+			btfsc	SIGNAL_TIMER_NIGHT_DISABLE
+			call	timer_night_disable
 			
 			movf    setup_mode, w
 			btfss   ZERO
-			call	display_setup			
+			call	setup_display
 
 			movf	var_timer_target_temp, w	; Flash unit if displaying target temperature
 			btfss	ZERO
 			call	flash_unit
 			
 			btfss	FLAG_HAS_LIGHT_SENSOR
-			call	day_night_mode	; Set day/night if no sensor
+			call	day_night_mode			; Set day/night if no sensor
 			
 			btfsc	FLAG_TEMPERATURE_CHANGED
 			call	temp_change
@@ -148,8 +165,8 @@ main_timer_signals:	btfsc	SIGNAL_TIMER_TARGET_TEMPERATURE
 ;--------------------------------------------------------- 
 ; Flash unit symbol
 ;--------------------------------------------------------- 
-flash_unit:		movf	timer50hz, w
-			addlw	-10
+flash_unit:		movf	var_timer_125hz, w
+			addlw	-25
 			btfss	CARRY
 			goto	flash_unit_blank
 
@@ -166,36 +183,29 @@ flash_unit_blank:	bcf	LED_CELSIUS
 ;--------------------------------------------------------- 
 ; Set day / night mode
 ;--------------------------------------------------------- 
-day_night_mode:		movf	light_sensor_value, w
+day_night_mode:		btfss	FLAG_NIGHT_MODE_AUTOMATIC
+			return	; No automatic night mode
+			btfsc	FLAG_STANDBY
+			return	; Skip in stand-by
+
+			movf	setup_mode, w
+			btfss	ZERO
+			return	; Skip in setup
+
+			movf	light_sensor_value, w
 			subwf	light_sensor_limit, w
 			btfsc	CARRY
 			goto	day_night_mode_night
 
 			btfss	FLAG_NIGHT_MODE
 			return	; Already day mode
-			btfsc	FLAG_STANDBY
-			return	; Skip in stand-by
-			btfsc	FLAG_DISPLAY_OFF
-			return	; Skip if manually switched off
-
 			bcf	FLAG_NIGHT_MODE
-			btfss	FLAG_DISPLAY_ENABLE
-			call	display_on
-			return
+			goto	display_day
 			
-day_night_mode_night:	btfsc	FLAG_KEEP_DISPLAY_ON
-			return
-			btfsc	FLAG_NIGHT_MODE
+day_night_mode_night:	btfsc	FLAG_NIGHT_MODE
 			return	;Already in night mode
-			
-			movf	setup_mode, w
-			btfss	ZERO
-			return				; Skip in setup
-			
 			bsf	FLAG_NIGHT_MODE
-			btfsc	FLAG_DISPLAY_ENABLE	; Switch display off if on
-			call	display_off
-			return
+			goto	display_night
 			
 ;--------------------------------------------------------- 
 ; Evaluate temperature or target change
@@ -229,11 +239,11 @@ temp_delay_heat:	movf	target_temperature,  w
 			btfss	CARRY
 			goto	schedule_relay_on	; Target not reached
 
-schedule_relay_off:	btfss	RELAY
+schedule_relay_off:	btfss	PIN_RELAY
 			goto	timer_relay_stop	; Already off
 			goto	timer_relay_start
 
-schedule_relay_on:	btfsc	RELAY
+schedule_relay_on:	btfsc	PIN_RELAY
 			goto	timer_relay_stop	; Already on
 			goto	timer_relay_start
 
@@ -260,49 +270,39 @@ set_relay_heating:	movf	target_temperature,  w
 			btfss	CARRY
 			goto	set_relay_on
 
-set_relay_off:		bcf	RELAY
+set_relay_off:		bcf	PIN_RELAY
 			call	timer_valve_maint_strt
-			btfss	FLAG_DISPLAY_ENABLE
-			return			; Display off 
-			
-			bsf	RP0
-			bsf	LED_POWER	; TRIS -> input
-			bcf	RP0		; => lit + blue led
+			bcf	LED_POWER_RED			
+			bsf	LED_POWER_ON			
 			return
 
-set_relay_on:		bsf	RELAY
+set_relay_on:		bsf	PIN_RELAY
 			call	timer_valve_maint_stop
 			bcf	SIGNAL_TIMER_VALVE_MAINTAIN
-			btfss	FLAG_DISPLAY_ENABLE
-			return			; Display off 
-			
-			bsf	RP0
-			bcf	LED_POWER	; TRIS -> output
-			bcf	RP0
-			bsf	LED_POWER	; => lit + red led
+			bsf	LED_POWER_RED			
+			bsf	LED_POWER_ON			
 			return
 			
 ;--------------------------------------------------------- 
 ; Read temperature and process
 ;--------------------------------------------------------- 
 read_temperature:	bcf	SIGNAL_TIMER_THERMOMETER
-
 			call	one_wire_reset
 			btfss	CARRY
 			goto	failure_thermometer
+
 			movlw	ONE_WIRE_SKIP_ROM
+			bcf	CARRY
 			call	one_wire_tx
 			movlw	DS18B20_READ
+			bcf	CARRY
 			call	one_wire_tx
 
-			movlw	arg_4		; LSB
-			movwf	FSR
 			call	one_wire_rx
-
-			movlw	arg_5		; MSB
-			movwf	FSR
+			movwf	arg_4		; LSB
 			call	one_wire_rx
-
+			movwf	arg_5		; MSB
+			
 			bcf	CARRY
 			rrf	arg_5, f    ; Discard bit 0
 			rrf	arg_4, f
@@ -336,25 +336,19 @@ measure_temperature:	call	one_wire_reset
 			btfss	CARRY
 			goto	failure_thermometer
 			movlw	ONE_WIRE_SKIP_ROM
+			bcf	CARRY
 			call	one_wire_tx
+
 			movlw	DS18B20_CONVERT
+			bcf	CARRY
+			btfss	FLAG_ONEWIRE_SELF_POWERED
+			bsf	CARRY		    ; Parasite power
 			call	one_wire_tx
 			
-			movlw	50		    ; Wait 50 * 20ms = 1s  for conversion
+			movlw	MEASURE_FREQUENCY
 			bcf	SIGNAL_TIMER_THERMOMETER
 			movwf	var_timer_thermometer   ; Start conversion timer
 			return
-
-			
-flip_led_f:		btfsc	LED_FAHRENHEIT
-			goto	flip_led_f_clear
-			
-			bsf	LED_FAHRENHEIT
-			return
-			
-flip_led_f_clear:	bcf	LED_FAHRENHEIT
-			return
-
 			
 			
 ;--------------------------------------------------------- 

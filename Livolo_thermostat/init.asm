@@ -3,9 +3,10 @@
 
 ; Uses
 global	read_eeprom, write_eeprom
-global	one_wire_reset
+global  one_wire_set_port, one_wire_set_pin, one_wire_reset
 global	main, failure
 global  chk_target_temp_range, chk_offset_range
+global  chk_brightness_range, chk_brightness_night_range
 global	valve_maint_calc			
 
 config WDTE = OFF       // Watchdog Timer Enable bit (WDT disabled and can be enabled by SWDTEN bit of the WDTCON register)
@@ -30,13 +31,20 @@ init:			clrf	STATUS		; select bank 0
 			movwf	FSR
 init_clear_bank0:	clrf	INDF
 			incf	FSR, f
-			btfss	FSR, 7		; Loop until bit 8 = 1 => 80h
+			btfss	FSR, 7		; Loop until bit 7 = 1 => 80h
 			goto	init_clear_bank0
+
+			; bank 1 variables
+			movlw	0A0h
+			movwf	FSR
+init_clear_bank1:	clrf	INDF
+			incf	FSR, f
+			btfss	FSR, 6		; Loop until bit 6 = 1 => C0h
+			goto	init_clear_bank1
 			
 			; Start display blank
-			movlw	15
-			movwf	disp_l
-			movwf	disp_r
+			movlw	0ffh
+			movwf	display_bcd
 
 			movlw	50			; Set light sensor initial
 			movwf	light_sensor_value	;  value to 50
@@ -139,23 +147,22 @@ init_clear_bank0:	clrf	INDF
 			iorlw	(1 << OPTION_REG_T0CS_POSN) | TMR0_PS_1_256
 			movwf	OPTION_REG
 
-			; Setup timer 2
-			;   Prescaler 4 ( = 4us @ 4Mzh)
-			;   Reload 250
-			;   Postscaler 10
-			;  => 4us * 250 * 10 = 10ms
-
 			clrf	PIE1		; Peripheral int enable TMR2
 			clrf	PIE2
 			bsf	TMR2IE
-			movlw	250
+			movlw	TIMER2_PERIOD
 			movwf	PR2
 			
 			clrf	STATUS			; bank 0
 			clrf	T1CON			; Timer 1 at Fosc / 4
 			clrf	TMR2
-			;	Post-scaler 10                         Enable          Pre-scaler 4
-			movlw	((10 - 1) << T2CON_TOUTPS_POSN) | (1 << T2CON_TMR2ON_POSN) | 1
+
+			; Setup timer 2
+			;   Prescaler 16 = 8us (@ 8Mzh  Fosc/4)
+			;   Postscaler 5 = 40us per timer unit (8us * 5)
+			;   TIMER2_PERIOD 200 = 8ms (40us * 200)
+			;	Post-scaler 5                         Enable          Pre-scaler 16
+			movlw	((5 - 1) << T2CON_TOUTPS_POSN) | (1 << T2CON_TMR2ON_POSN) | 0b10
 			movwf	T2CON
 			
 			; Enable timer 2 interupt
@@ -167,7 +174,22 @@ init_clear_bank0:	clrf	INDF
 ;--------------------------------------------------------- 
 ; Read EEPROM settings
 ;--------------------------------------------------------- 
+			; Restore brightness
+			movlw	EE_BRIGHTNESS
+			call	read_eeprom
+			call	chk_brightness_range
+			btfss	CARRY			; Carry set => valid
+			movlw	BRIGHTNESS_MAX		; Otherwise default value
+			movwf	brightness
 			
+			; Restore brightness for night mode
+			movlw	EE_BRIGHTNESS_NIGHT
+			call	read_eeprom
+			call	chk_brightness_night_range
+			btfss	CARRY			; Carry set => valid
+			movlw	BRIGHTNESS_NIGHT_MIN	; Otherwise default value
+			movwf	brightness_night
+
 			;Restore unit
 			movlw	EE_FAHRENHEIT
 			call	read_eeprom
@@ -222,7 +244,7 @@ target_temp_offset:	movlw	EE_TEMPERATURE_OFFSET
 			movlw	EE_VALVE_MAINTAIN
 			call	read_eeprom
 			movwf	valve_maintain_days
-			subwf	VALVE_MAINTAIN_MAX	; More than VALVE_MAINTAIN_MAX
+			sublw	VALVE_MAINTAIN_MAX	; ; C   <= VALVE_MAINTAIN_MAX
 			btfss	CARRY			; Skip if <=
 			clrf	valve_maintain_days	; Default off
 			call	valve_maint_calc	; Update initialization value
@@ -231,7 +253,7 @@ target_temp_offset:	movlw	EE_TEMPERATURE_OFFSET
 			clrf	operation_mode		; Default heating
 			movlw	EE_OPERATION_MODE
 			call	read_eeprom
-			subwf	OPERATION_MODE_COOLING
+			sublw	OPERATION_MODE_COOLING
 			btfsc	ZERO
 			incf	operation_mode
 
@@ -244,14 +266,18 @@ target_temp_offset:	movlw	EE_TEMPERATURE_OFFSET
 			btfss	CARRY
 			movwf	light_sensor_limit	; Set default value
 			
-			; Wait until oscillator is stable
 		    	bsf	RP0
+			; Set clock to 8Mhz
+			bsf	IRCF0
+			bsf	IRCF1
+			bsf	IRCF2
+
 wait_osc_stable:	btfss	HTS
 			goto	wait_osc_stable
 			bcf	RP0
 
 			bsf	GIE			; Global int enable
-
+			
 			; Start cap sensor measuring
 			clrf    TMR1H
 			clrf    TMR1L
@@ -262,25 +288,31 @@ wait_osc_stable:	btfss	HTS
 			bsf	T0IE
 
 			; Detect the DS18B20 Thermometer
+			movlw	PORTB
+			call	one_wire_set_port
+
 			; Try on RB4
 			btfss	PORTB, 4
 			goto	try_thermometer_rb6	; Low => can't be OneWire
-			call	one_wire_reset
+			movlw	4
+			call	one_wire_set_pin
+			call	one_wire_reset		; Port B, pin 4
 			btfss	CARRY
 			goto	try_thermometer_rb6	; No PD detect on RB4
 			goto	main
 			
 try_thermometer_rb6:	btfss	PORTB, 6
 			goto	error_rb6_low
-			bsf	FLAG_ONEWIRE_RB6		
 
-			call	one_wire_reset
+			movlw	6
+			call	one_wire_set_pin
+			call	one_wire_reset		; Port B, pin 6
 			btfss	CARRY
 			goto	error_no_therm_rb6	; No PD detect on RB6
 			
 			; The thermometer is connected to RB6
 			; Configure RB4 as analog input AN10
-			; For light detection
+			;  for light sensor
 			; AN10 with Vdd and left justified
 			bsf	FLAG_HAS_LIGHT_SENSOR
 			movlw	(10 << ADCON0_CHS_POSN) | (1 << ADCON0_ADON_POSN)

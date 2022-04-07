@@ -7,14 +7,15 @@ psect   code
 global	touch_power_short, touch_power_long
 global	touch_plus_short,  touch_plus_long
 global  touch_minus_short, touch_minus_long
-global	touch_enter_setup
 global  touch_repeat, touch_repeat_stop   
 global  chk_target_temp_range
 ; Use
-global	enter_setup, touch_plus_setup, touch_minus_setup    
-global	display_temperature   
-global display_on, display_off, convert_fahrenheit   
-global read_eeprom, write_eeprom    
+global	setup_next, setup_plus, setup_minus, setup_end
+global	display_temperature, display_decimal   
+global  convert_fahrenheit   
+global  display_day, display_night, disp_set_brightness   
+global  timer_set_night_disable
+global  read_eeprom, write_eeprom    
     
 ;--------------------------------------------------------- 
 ; Power short
@@ -22,15 +23,18 @@ global read_eeprom, write_eeprom
 touch_power_short:	bcf	SIGNAL_TOUCH_POWER_SHORT
 			movf    setup_mode, w
 			btfss   ZERO
-			goto	enter_setup	; In setup advance to next setting
+			goto	setup_next		; In setup advance to next setting
 			
 			; Invert on / off state
 			bsf	FLAG_TEMPERATURE_CHANGED
 			bsf	FLAG_RELAY_IMMEDIATE
 
-			btfss	FLAG_DISPLAY_ENABLE
-			goto	touch_power_short_on
-
+			btfsc	FLAG_NIGHT_MODE
+			goto	night_mode_leave
+			
+			btfsc	FLAG_STANDBY
+			goto	stand_by_leave
+			
 			; Stand-by
 			; Set freeze safe temperature
 			clrf	var_timer_target_temp	; Make sure temperature is not written by this timer
@@ -39,27 +43,32 @@ touch_power_short:	bcf	SIGNAL_TOUCH_POWER_SHORT
 			btfsc	ZERO
 			goto	stand_by_heating
 
-stand_by_colling:	movlw	255
-			goto	enter_stand_by
+stand_by_cooling:	movlw	255
+			goto	stand_by_set_temp
 			
 stand_by_heating:	movlw	STANDBY_TARGET_TEMPERATURE_CELSIUS
 			btfsc	FLAG_FAHRENHEIT
 			call	convert_fahrenheit	; Convert to fahrenheit if required
 
-enter_stand_by:		movwf	target_temperature
+stand_by_set_temp:	movwf	target_temperature
 			bsf	FLAG_STANDBY
-			goto	display_off
+			bcf	FLAG_NIGHT_MODE_AUTOMATIC
 
-touch_power_short_on:	; Restore target temperature from EEPROM
+			clrf	disp_brightness		; Display off
+			return
+
+stand_by_leave:		bcf	FLAG_STANDBY
+			bsf	FLAG_NIGHT_MODE_AUTOMATIC
+
+			; Restore target temperature from EEPROM
 			movlw	EE_TARGET_TEMPERATURE
 			call	read_eeprom
 			movwf	target_temperature
-    
-			bcf	FLAG_STANDBY
-			bcf	FLAG_DISPLAY_OFF
-			call	set_display_off_delay
+			
+night_mode_leave:	call	timer_set_night_disable
 			bcf	FLAG_NIGHT_MODE
-			goto	display_on
+			call	display_day
+			return
 			
 ;--------------------------------------------------------- 
 ; Power long
@@ -67,12 +76,11 @@ touch_power_short_on:	; Restore target temperature from EEPROM
 touch_power_long:	bcf	SIGNAL_TOUCH_POWER_LONG
 			movf    setup_mode, w
 			btfss   ZERO
-			return				; Ignore in setup mode
+			goto	setup_end
 
-			btfss	FLAG_DISPLAY_ENABLE	; Switch display off if on
-			return
-			bsf	FLAG_DISPLAY_OFF
-			goto	display_off
+			bcf	FLAG_NIGHT_MODE_AUTOMATIC
+			bsf	FLAG_NIGHT_MODE
+			goto	display_night
 
 ;--------------------------------------------------------- 
 ; Plus short
@@ -80,21 +88,19 @@ touch_power_long:	bcf	SIGNAL_TOUCH_POWER_LONG
 touch_plus_short:	bcf	SIGNAL_TOUCH_PLUS_SHORT
 			btfsc	FLAG_STANDBY
 			return			; Ignore in stand-by
-			btfsc	FLAG_DISPLAY_ENABLE
-			goto	touch_plus_short_2
-			bcf	FLAG_DISPLAY_OFF
-			bcf	FLAG_NIGHT_MODE
-			call	display_on	; Switch on the display if off
 
-touch_plus_short_2:	call	set_display_off_delay
+			call	timer_set_night_disable
+			bcf	FLAG_NIGHT_MODE
+			call	display_day
+
 			movf    setup_mode, w
 			btfss   ZERO
-			goto	touch_plus_setup
+			goto	setup_plus
 
 			movf	var_timer_target_temp, w
 			btfsc	ZERO
 			goto	touch_disp_target_temp	; On first touch just display
-			
+
 			; Increase target temperature
 			incf	target_temperature, f
 			btfss	FLAG_FAHRENHEIT
@@ -120,9 +126,7 @@ touch_plus_long:	movf    setup_mode, w
 
 			movlw	TOUCH_REPEAT
 			movwf   var_timer_touch_repeat
-
-			movf    setup_mode, w
-			goto	touch_plus_setup
+			goto	setup_plus
 
 ;--------------------------------------------------------- 
 ; Minus short
@@ -130,16 +134,14 @@ touch_plus_long:	movf    setup_mode, w
 touch_minus_short:	bcf	SIGNAL_TOUCH_MINUS_SHORT
 			btfsc	FLAG_STANDBY
 			return			; Ignore in stand-by
-			btfsc	FLAG_DISPLAY_ENABLE
-			goto	touch_minus_short_2
-			bcf	FLAG_DISPLAY_OFF
+
+			call	timer_set_night_disable
 			bcf	FLAG_NIGHT_MODE
-			call	display_on	; Switch on the display if off
-			
-touch_minus_short_2:	call	set_display_off_delay
+			call	display_day
+
 			movf    setup_mode, w
 			btfss   ZERO
-			goto	touch_minus_setup
+			goto	setup_minus
     
 			movf	var_timer_target_temp, w
 			btfsc	ZERO
@@ -170,10 +172,7 @@ touch_minus_long:	movf    setup_mode, w
 
 			movlw	TOUCH_REPEAT
 			movwf   var_timer_touch_repeat
-
-			movf    setup_mode, w
-			goto	touch_minus_setup
-
+			goto	setup_minus
 			
 ;--------------------------------------------------------- 
 ; Repeat timer on hold
@@ -184,9 +183,9 @@ touch_repeat:		bcf	SIGNAL_TIMER_TOUCH_REPEAT
 
 			movf    setup_mode, w
 			btfsc	SIGNAL_TOUCH_PLUS_LONG
-			goto	touch_plus_setup
+			goto	setup_plus
 			btfsc	SIGNAL_TOUCH_MINUS_LONG
-			goto	touch_minus_setup
+			goto	setup_minus
 			return
 			
 ;--------------------------------------------------------- 
@@ -219,9 +218,11 @@ touch_enter_setup:	btfss	SIGNAL_TOUCH_PLUS_LONG
 			; Both touched
 			bcf	SIGNAL_TOUCH_PLUS_LONG
 			bcf	SIGNAL_TOUCH_MINUS_LONG
-			btfss	FLAG_DISPLAY_ENABLE
-			call	display_on	; Switch on the display if off
-			goto	enter_setup
+
+			call	display_day
+;			btfss	FLAG_DISPLAY_ENABLE
+;			call	display_on	; Switch on the display if off
+			goto	setup_next
 
 ;--------------------------------------------------------- 
 ; Set target temperature
@@ -270,16 +271,4 @@ chk_target_temp_rangef:	sublw	FAHRENHEIT_MAX	    ; C => <= FAHRENHEIT_MAX
 			; Restore w
 			addlw	FAHRENHEIT_MIN	    ; Restore W
 			bsf	CARRY		    ; Ok
-			return
-			
-;--------------------------------------------------------- 
-; Start timer before the light sensor can switch off the display
-;--------------------------------------------------------- 
-set_display_off_delay:	bsf	FLAG_KEEP_DISPLAY_ON
-			bcf	GIE
-			movlw	KEEP_DISPLAY_ON_TIMER & 0ffh
-			movwf	var_timer_keep_displ_on
-			movlw	KEEP_DISPLAY_ON_TIMER >> 8
-			movwf	var_timer_keep_displ_on + 1
-			bsf	GIE
 			return
