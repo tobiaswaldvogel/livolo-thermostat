@@ -78,6 +78,7 @@ touch_power_long:	bcf	SIGNAL_TOUCH_POWER_LONG
 			btfss   ZERO
 			goto	setup_end
 
+			clrf	var_timer_night_disable	    ; Stop timer as it would re-enable automatic night mode
 			bcf	FLAG_NIGHT_MODE_AUTOMATIC
 			bsf	FLAG_NIGHT_MODE
 			goto	display_night
