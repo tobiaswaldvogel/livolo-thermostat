@@ -150,9 +150,9 @@ global  EE_BRIGHTNESS, EE_BRIGHTNESS_NIGHT
    
 #define FLAG_TMR2_INT_EVEN		flags1, 0
 #define FLAG_TMR2_DIM			flags1, 1
-#define FLAG_FAHRENHEIT			flags1, 2
-#define FLAG_TEMPERATURE_CHANGED	flags1, 3
-#define FLAG_RELAY_IMMEDIATE		flags1, 4
+#define FLAG_FAHRENHEIT			flags1, 3
+#define FLAG_TEMPERATURE_CHANGED	flags1, 4
+#define FLAG_RELAY_IMMEDIATE		flags1, 5
 #define FLAG_ONEWIRE_SELF_POWERED	flags1, 6
 #define	FLAG_HAS_LIGHT_SENSOR		flags1, 7
 

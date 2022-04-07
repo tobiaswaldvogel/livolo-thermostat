@@ -267,29 +267,29 @@ isr_timer2:	    bcf	    TMR2IF	    ; Acknoledge interrupt
 		    goto    isr_timer2_display
 
 		    ; Interrupt for dimming the display
-		    ; The remaining time slice to 10ms is
-		    ; 250 - brightness timer 2 units
+		    ; The remaining time slice to 8ms is
+		    ; 200 - brightness timer2 units
+		    bcf	    FLAG_TMR2_DIM
+
 		    movf    disp_brightness, w
 		    sublw   TIMER2_PERIOD
 		    bsf	    RP0			; Bank 1
 		    movwf   PR2
 		    bcf	    RP0			; Bank 0
 
-		    bcf	    FLAG_TMR2_DIM
 		    bcf	    PIN_LED_CELSIUS
 		    bcf	    PIN_LED_FAHRENHEIT
 
 		    movf    setup_mode, w
 		    btfss   ZERO
-		    goto    isr_ret		; In setup mode don't modify the LEDs
+		    goto    isr_timer2_dim_end	; In setup mode don't modify the LEDs
 		    
 		    ; Switch off + / -
 		    bsf	    RP0
 		    bcf	    PIN_LED_POWER	; TRIS -> output
 		    bcf	    RP0
 		    bcf	    PIN_LED_POWER
-		    
-		    goto    isr_ret		; No then do it in the next interrupt
+isr_timer2_dim_end: goto    isr_ret		; No then do it in the next interrupt
 
 isr_timer2_display: movf    disp_brightness, w
 		    btfsc   ZERO
