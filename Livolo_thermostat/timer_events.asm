@@ -11,8 +11,8 @@ global  valve_maint_calc
 global	timer_adc
 global  timer_set_night_disable, timer_night_disable
 ; Use
-global	display_temperature, display_decimal
-global  display_day, display_night   
+global	display_temperature, display_unit, display_decimal
+global  display_day, display_night
 global	read_eeprom, write_eeprom  
 global	set_relay_on   
 
@@ -27,6 +27,7 @@ timer_target_temp:	bcf	SIGNAL_TIMER_TARGET_TEMPERATURE
 			call	write_eeprom
 			
 			; Display current temperature again
+			call	display_unit
 			movf	current_temperature, w
 			goto	display_temperature
     
