@@ -98,14 +98,6 @@ main_detect_power_mode:	bsf	FLAG_ONEWIRE_SELF_POWERED
 			movlw	1   ; Set the timer to 1s for the initial read
 			movwf	var_timer_thermometer
 			
-			; Activate a watchdog with prescaler 2^16 
-			; as the clock source is 31khz this is ~ 2s
-			; Min prescaler is 2^5
-			bsf	RP0
-			movlw	((16 - 5) << WDTCON_WDTPS_POSITION) | (1 << WDTCON_SWDTEN_POSN)
-			movwf	WDTCON
-			bcf	RP0
-
 main_check_signals:	clrwdt				    ;Reset watchdog
 			btfsc	SIGNAL_TOUCH_POWER_SHORT
 			call	touch_power_short

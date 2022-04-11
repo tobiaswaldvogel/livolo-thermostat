@@ -58,11 +58,13 @@ Brightness for the day mode (range 2..50).
 Brightness for the day mode (range 0..50). 0 = display off
 
 ### Current light sensor value, read-only (Both digits and C and F flashing)
-The current reading of the light sensor. If no sensor is present then it defaults to 50  
+The current reading of the light sensor with a range from 1..98, where 1 is darkest.  
+If no sensor is present then it defaults to 50  
 <img src="light_sensor_status.jpg"/>
 
 ### Light sensor threshold (Both digits flashing, C and F off)
 Threshold for turning the display off (night mode). The light sensor value from the step before can be used to find a good setting.  
+As the sensor has range from 1..98, setting it to 0 means deactivate night mode whereas 99 is permanent night mode.
 
 ### Unit Celsius / Fahrenheit (Digits off, C or  F flashing)
 Switches between Celsius and Fahrenheit

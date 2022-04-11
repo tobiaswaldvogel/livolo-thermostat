@@ -159,20 +159,25 @@ timer_valve_maint:	btfsc	FLAG_NIGHT_MODE
 ; Timer for light sensor ADC
 ;--------------------------------------------------------- 
 timer_adc:		bcf	SIGNAL_TIMER_ADC
-			movlw	99
-			movwf	light_sensor_value	; For display in setup
+			movlw	98			; Default value if out of range
+			movwf	light_sensor_value
 
-			movf	ADRESH, w
-			addlw	- (255 - 98)
+			;           ------                        -----
+			;  Vcc ----|  5K  |----- RB4 (AN10)  ----| LDR |----- Vss
+			;           ------                        -----
+			
+			movf	ADRESH, w		; 0 .. 255 (0 brightest)
+			addlw	98			; C if the darkest 98 values
 			btfss	CARRY
-			goto	timer_adc_day_mode	; > 255 - 98 => on
-
-			sublw	99			; 1 .. 99
+			goto	timer_adc_check_mode
+			sublw	98			; Translate 0..97 to 98..1
 			movwf	light_sensor_value	; For display in setup
-			subwf	light_sensor_limit, w	; cc -> > light_sensor_limit
+
+timer_adc_check_mode:	movf	light_sensor_value, w	; Might be the default value
+			subwf	light_sensor_limit, w 	; C  <=  light_sensor_limit
 			btfsc	CARRY			
 			goto	timer_adc_night_mode
-
+			
 timer_adc_day_mode:	btfss	FLAG_NIGHT_MODE
 			goto	timer_adc_clear_cntr	; Already in day mode
 			goto	timer_adc_settle

@@ -274,9 +274,17 @@ target_temp_offset:	movlw	EE_TEMPERATURE_OFFSET
 
 wait_osc_stable:	btfss	HTS
 			goto	wait_osc_stable
-			bcf	RP0
 
+			; Activate a watchdog with prescaler 2^16 
+			; as the clock source is 31khz this is ~ 2s
+			; Min prescaler is 2^5
+			movlw	((16 - 5) << WDTCON_WDTPS_POSITION) | (1 << WDTCON_SWDTEN_POSN)
+			movwf	WDTCON
+			
+			bcf	RP0
 			bsf	GIE			; Global int enable
+
+			clrwdt
 			
 			; Start cap sensor measuring
 			clrf    TMR1H
