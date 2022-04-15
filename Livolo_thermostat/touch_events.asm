@@ -220,9 +220,8 @@ touch_enter_setup:	btfss	SIGNAL_TOUCH_PLUS_LONG
 			bcf	SIGNAL_TOUCH_PLUS_LONG
 			bcf	SIGNAL_TOUCH_MINUS_LONG
 
+			bcf	FLAG_NIGHT_MODE
 			call	display_day
-;			btfss	FLAG_DISPLAY_ENABLE
-;			call	display_on	; Switch on the display if off
 			goto	setup_next
 
 ;--------------------------------------------------------- 

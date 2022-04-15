@@ -94,7 +94,7 @@ setup_next:		call	setup_display_blank
 			btfsc	CARRY
 			return				    ; Not the laste item
 			
-leave_setup:		clrf	setup_mode, f
+leave_setup:		clrf	setup_mode
 			call	valve_maint_calc    ; Update initialization value
 			bsf	FLAG_TEMPERATURE_CHANGED    ; Refresh temperature
 			bsf	FLAG_RELAY_IMMEDIATE	    ; and timers

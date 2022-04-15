@@ -119,6 +119,11 @@ global	target_temperature, relay_delay, temperature_offset
 global	current_temperature, light_sensor_limit, light_sensor_value, light_sensor_counter
 global	valve_maintain_days, operation_mode
 
+#ifdef DEBUG
+global  var_debug, var_debug_out_ctrl   
+global  toggle_f_led, debug_output    
+#endif   
+   
 ; EEPROM locations   
 global  EE_TARGET_TEMPERATURE, EE_TEMPERATURE_OFFSET
 global  EE_RELAY_DELAY, EE_FAHRENHEIT, EE_LIGHT_SENSOR

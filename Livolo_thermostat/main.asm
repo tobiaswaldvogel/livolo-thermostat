@@ -16,7 +16,7 @@ global  timer_valve_maint, timer_night_disable
 global	setup_display, display_temperature, display_decimal
 global  display_day, display_night, disp_set_brightness, display_unit   
 global	one_wire_reset, one_wire_rx, one_wire_tx
-
+    
 psect   code
    
 ;--------------------------------------------------------- 
@@ -143,6 +143,16 @@ main_timer_signals:	btfsc	SIGNAL_TIMER_TARGET_TEMPERATURE
 			btfss   ZERO
 			call	setup_display
 
+#ifdef DEBUG
+			movf	var_debug_out_ctrl, w
+			btfsc	ZERO
+			goto	main_no_debug_out
+
+			call	debug_output
+			goto	main_check_signals
+main_no_debug_out:
+#endif    
+			
 			movf	var_timer_target_temp, w	; Flash unit if displaying target temperature
 			btfss	ZERO
 			call	flash_unit

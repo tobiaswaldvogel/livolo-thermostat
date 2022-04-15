@@ -1,8 +1,7 @@
 #include <xc.inc>
 #include "global.inc"
-    
+
 global write_eeprom, read_eeprom
-global toggle_f_led    
 
 psect code
 
@@ -41,6 +40,12 @@ read_eeprom:		bcf	RP0
 			bcf	RP1	; bank 0
 			return
 
+			
+#ifdef DEBUG
+
+global display_decimal
+global toggle_f_led, debug_output    
+			
 ;--------------------------------------------------------- 
 ; Toggle Fahrenheit indicator for debugging
 ;--------------------------------------------------------- 
@@ -50,4 +55,78 @@ toggle_f_led:		btfss	LED_FAHRENHEIT
 			return
 set_f_led:		bsf	LED_FAHRENHEIT    
 			return
+
+;--------------------------------------------------------- 
+; Output of 4 digit hex for debug purpose
+;
+; Sample usage:
+; #ifdef DEBUG			
+; movf var_debug_out_ctrl, w   ; Check if still output of value before
+; btfss ZERO
+; goto deb_end		    
+;		    
+; movlw	    12h
+; movwf     var_debug	       ; Low byte
+; movlw     34h
+; movwf     var_debug + 1      ; High byte
+;
+; movlw	    5		       ; Activate output
+; movwf	    var_debug_out_ctrl		    
+; deb_end:		    
+; #endif			
+;			
+;--------------------------------------------------------- 
+debug_output:		movf	var_debug_out_ctrl, w
+			btfsc	ZERO
+			return				; Zero => done
+
+			subwf	var_timer_125hz, w
+			btfss	ZERO
+			return
 			
+			movf	var_debug_out_ctrl, w
+			decf	var_debug_out_ctrl, f
+			
+debug_output_done:	addlw	-1
+			btfss	ZERO
+			goto	debug_output_1
+			clrf	var_debug_out_ctrl	; Indicate done
+			return
+			
+debug_output_1:		addlw	-1
+			btfss	ZERO
+			goto	debug_output_2
+			; Digit 1
+			movf	var_debug, w
+			andlw	0fh
+			bcf	LED_FAHRENHEIT
+			bcf	LED_CELSIUS
+			goto	display_decimal
+			
+debug_output_2:		addlw	-1
+			btfss	ZERO
+			goto	debug_output_3
+			; Digit 2
+			swapf	var_debug, w
+			andlw	0fh
+			bcf	LED_FAHRENHEIT
+			bsf	LED_CELSIUS
+			goto	display_decimal
+			
+debug_output_3:		addlw	-1
+			btfss	ZERO
+			goto	debug_output_4
+			; Digit 3
+			movf	var_debug + 1, w
+			andlw	0fh
+			bsf	LED_FAHRENHEIT
+			bcf	LED_CELSIUS
+			goto	display_decimal
+			
+			; digit 4
+debug_output_4:		swapf	var_debug + 1, w
+			andlw	0fh
+			bsf	LED_FAHRENHEIT
+			bsf	LED_CELSIUS
+			goto	display_decimal
+#endif		

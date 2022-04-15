@@ -41,6 +41,11 @@ operation_mode:		    ds	1
 isr_status:		    ds	1
 isr_fsr:		    ds	1    
 
+#ifdef DEBUG    
+var_debug:		    ds	2
+var_debug_out_ctrl:	    ds	1    
+#endif
+    
 psect	common, abs, space=SPACE_DATA, noexec
 			    org	70h
 arg_0:			    ds	1

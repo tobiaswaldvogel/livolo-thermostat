@@ -4,7 +4,7 @@
 psect	isr_local_var, global, class=BANK0, space=SPACE_DATA, delta=1, noexec
 cap_sensor_touched: ds	    1    
 cap_sensor:	    ds	    1		    ; Current sensr 0 - 2
-cap_sensor_avg:	    ds	    3 * 2	    ; Avg. raw data
+cap_sensor_avg:	    ds	    3 * 2 	    ; Avg. raw data
 cap_sensor_trip:    ds	    2
 cap_new_avg:	    ds	    3
 
@@ -69,7 +69,7 @@ cap_sensor_minus:   addlw   -1
 		    bsf	    CM2CON0, 0
 		    goto    cap_sensor_calc
 		    
-cap_sensor_power:   bsf	    CM1CON0, 0	    ; Select inuput C12IN1-
+cap_sensor_power:   bsf	    CM1CON0, 0	    ; Select inuput C12IN1- (plus)
 		    bcf	    CM1CON0, 1
 		    bsf	    CM2CON0, 0
 		    bcf	    CM2CON0, 1
@@ -126,13 +126,20 @@ cap_sens_calc_trip: movf    INDF, w	    ; avg low
 		    btfss   CARRY
 		    decf    cap_sensor_trip + 1
 
+		    ; With the thermometer hardware modification it may be
+		    ; more difficult to cover the whole area for '+'
+		    ; There use a smaller trip treshold of 4 / 512 ~ 0.8% 
+		    movf    cap_sensor, w	; Which sensor ?
+		    btfsc   ZERO 
+		    goto    cap_sens_calc_trp2	; '+' sensor
+		    
 		    bcf	    CARRY
 		    rrf	    INDF, w
 		    subwf   cap_sensor_trip, f
 		    btfss   CARRY
 		    decf    cap_sensor_trip + 1
 
-		    decf    FSR, f
+cap_sens_calc_trp2: decf    FSR, f
 		    btfsc   cap_sensor_trip + 1, 7 ; Result negative ?
 		    goto    cap_sens_calc_avg
 
